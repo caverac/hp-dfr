@@ -1,0 +1,18 @@
+# latexmk configuration for preprint
+
+# Use pdflatex
+$pdf_mode = 1;
+$pdflatex = 'pdflatex -interaction=nonstopmode -synctex=1 %O %S';
+
+# BibTeX
+$bibtex = 'bibtex %O %B';
+
+# Clean up
+$clean_ext = 'aux bbl blg log out toc lof lot fls fdb_latexmk synctex.gz';
+
+# Output directory (optional)
+# $out_dir = 'build';
+
+# Preview (uncomment for your system)
+# $pdf_previewer = 'open -a Preview %S';  # macOS
+# $pdf_previewer = 'evince %S';  # Linux
