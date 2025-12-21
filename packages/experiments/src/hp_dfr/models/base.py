@@ -1,122 +1,186 @@
-"""Base model class for PINNs and DFR implementations."""
+"""Base model class for PINNs and DFR implementations.
+
+This module provides the abstract base class that defines the common interface
+for all neural network PDE solvers, including PINNs and DFR variants.
+"""
 
 from abc import ABC, abstractmethod
-from typing import Callable, List, Optional, Tuple, Dict, Any
+from typing import Callable, Any, Literal
+
 import numpy as np
+import numpy.typing as npt
+
+from hp_dfr.problems.poisson_1d import Poisson1D
 
 
 class BaseModel(ABC):
     """Abstract base class for neural network PDE solvers.
 
-    This class defines the common interface for both PINNs and DFR models
-    across different backends (TensorFlow, JAX, PyTorch).
+    Defines the common interface for PINNs and DFR models across different
+    backends (TensorFlow, JAX, PyTorch).
 
-    Attributes:
-        hidden_layers: List of integers specifying neurons in each hidden layer.
-        activation: Activation function name (e.g., 'tanh', 'relu').
-        dtype: Data type for computations ('float32' or 'float64').
+    Parameters
+    ----------
+    hidden_layers : tuple[int, ...], optional
+        Number of neurons in each hidden layer, by default (10, 10, 10, 10).
+    activation : str, optional
+        Activation function for hidden layers ('tanh', 'relu'), by default 'tanh'.
+    dtype : str, optional
+        Floating point precision ('float32', 'float64'), by default 'float64'.
+    seed : int, optional
+        Random seed for reproducibility, by default 1234.
+
+    Attributes
+    ----------
+    hidden_layers : tuple[int, ...]
+        Network architecture specification.
+    activation : str
+        Activation function name.
+    dtype : str
+        Data type for computations.
+    seed : int
+        Random seed used for initialization.
+    history : dict[str, list[float]]
+        Training history containing loss and error metrics.
+
+    Notes
+    -----
+    Subclasses must implement `build`, `fit`, and `predict` methods.
     """
 
     def __init__(
         self,
-        hidden_layers: List[int] = [10, 10, 10, 10],
+        /,
+        *,
+        hidden_layers: tuple[int, ...] = (10, 10, 10, 10),
         activation: str = "tanh",
         dtype: str = "float64",
         seed: int = 1234,
     ):
-        """Initialize the base model.
-
-        Args:
-            hidden_layers: Number of neurons in each hidden layer.
-            activation: Activation function for hidden layers.
-            dtype: Floating point precision.
-            seed: Random seed for reproducibility.
-        """
         self.hidden_layers = hidden_layers
         self.activation = activation
         self.dtype = dtype
         self.seed = seed
         self._model = None
-        self._history: Dict[str, List[float]] = {"loss": [], "h1_error": []}
+        self._history: dict[str, list[float]] = {"loss": [], "h1_error": []}
 
     @abstractmethod
     def build(self, input_dim: int = 1, output_dim: int = 1) -> None:
         """Build the neural network architecture.
 
-        Args:
-            input_dim: Dimension of input (spatial coordinates).
-            output_dim: Dimension of output (solution components).
+        Parameters
+        ----------
+        input_dim : int, optional
+            Dimension of input (spatial coordinates), by default 1.
+        output_dim : int, optional
+            Dimension of output (solution components), by default 1.
         """
-        pass
 
     @abstractmethod
     def fit(
         self,
-        problem: Any,
+        problem: Poisson1D[Any],
         epochs: int = 1000,
         learning_rate: float = 1e-3,
         verbose: bool = True,
-    ) -> Dict[str, List[float]]:
+    ) -> dict[str, list[float]]:
         """Train the model on a given problem.
 
-        Args:
-            problem: Problem instance defining the PDE.
-            epochs: Number of training iterations.
-            learning_rate: Learning rate for optimizer.
-            verbose: Whether to print progress.
+        Parameters
+        ----------
+        problem : Poisson1D[Any]
+            Problem instance defining the PDE to solve.
+        epochs : int, optional
+            Number of training iterations, by default 1000.
+        learning_rate : float, optional
+            Learning rate for optimizer, by default 1e-3.
+        verbose : bool, optional
+            Whether to print progress during training, by default True.
 
-        Returns:
-            Dictionary containing training history.
+        Returns
+        -------
+        dict[str, list[float]]
+            Training history with keys 'loss' and optionally 'h1_error'.
         """
-        pass
 
     @abstractmethod
-    def predict(self, x: np.ndarray) -> np.ndarray:
+    def predict(self, x: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Evaluate the trained model at given points.
 
-        Args:
-            x: Input points of shape (n_points, input_dim).
+        Parameters
+        ----------
+        x : npt.NDArray[np.float64]
+            Input points of shape (n_points,) or (n_points, input_dim).
 
-        Returns:
-            Predicted solution values of shape (n_points, output_dim).
+        Returns
+        -------
+        npt.NDArray[np.float64]
+            Predicted solution values of shape (n_points,) or (n_points, output_dim).
         """
-        pass
 
     def compute_error(
         self,
-        x: np.ndarray,
-        exact_solution: Callable[[np.ndarray], np.ndarray],
-        norm: str = "l2",
+        x: npt.NDArray[np.float64],
+        exact_solution: Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]],
+        /,
+        *,
+        norm: Literal["l2", "h1"] = "l2",
     ) -> float:
         """Compute error between prediction and exact solution.
 
-        Args:
-            x: Points at which to evaluate error.
-            exact_solution: Function returning exact solution.
-            norm: Error norm ('l2' or 'h1').
+        Parameters
+        ----------
+        x : npt.NDArray[np.float64]
+            Points at which to evaluate the error.
+        exact_solution : Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]]
+            Function that returns the exact solution at given points.
+        norm : {'l2', 'h1'}, optional
+            Error norm to use, by default 'l2'.
 
-        Returns:
-            Error value.
+        Returns
+        -------
+        float
+            Computed error value.
+
+        Raises
+        ------
+        ValueError
+            If an unknown norm is specified.
+
+        Notes
+        -----
+        The H1 norm currently falls back to L2 (gradient computation not implemented).
         """
         u_pred = self.predict(x)
         u_exact = exact_solution(x)
 
         if norm == "l2":
             return float(np.sqrt(np.mean((u_pred - u_exact) ** 2)))
-        elif norm == "h1":
+        if norm == "h1":
             # For H1 norm, would need gradient computation
             # Simplified L2 error for now
             return float(np.sqrt(np.mean((u_pred - u_exact) ** 2)))
-        else:
-            raise ValueError(f"Unknown norm: {norm}")
+
+        raise ValueError(f"Unknown norm: {norm}")
 
     @property
-    def history(self) -> Dict[str, List[float]]:
-        """Return training history."""
+    def history(self) -> dict[str, list[float]]:
+        """Training history dictionary.
+
+        Returns
+        -------
+        dict[str, list[float]]
+            Dictionary with 'loss' and 'h1_error' keys containing per-epoch values.
+        """
         return self._history
 
     def summary(self) -> None:
-        """Print model summary."""
+        """Print a summary of the model configuration.
+
+        Displays the model class name, hidden layer architecture,
+        activation function, and data type. If the model has not been
+        built yet, prints a message indicating this.
+        """
         if self._model is not None:
             print(f"Model: {self.__class__.__name__}")
             print(f"Hidden layers: {self.hidden_layers}")

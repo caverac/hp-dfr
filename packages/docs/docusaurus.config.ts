@@ -6,8 +6,7 @@ import rehypeKatex from "rehype-katex";
 
 const config: Config = {
   title: "Adaptive hp-DFR",
-  tagline:
-    "Goal-Oriented Deep Fourier Residual Methods with Adaptive hp-Refinement",
+  tagline: "Goal-Oriented Deep Fourier Residual Methods with Adaptive hp-Refinement",
   favicon: "img/favicon.ico",
 
   url: "https://caverac.github.io",
@@ -54,8 +53,7 @@ const config: Config = {
     {
       href: "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css",
       type: "text/css",
-      integrity:
-        "sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV",
+      integrity: "sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV",
       crossorigin: "anonymous",
     },
   ],
@@ -121,7 +119,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} MATHMODE Group. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Carlos Vera-Ciro. Built with Docusaurus.`,
     },
     prism: {
       theme: prismThemes.github,

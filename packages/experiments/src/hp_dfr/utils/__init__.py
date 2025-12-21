@@ -1,3 +1,3 @@
-"""Utility functions for DFR-PINNs."""
+"""Utility functions for hp-dfr."""
 
-__all__ = []
+__all__: list[str] = []

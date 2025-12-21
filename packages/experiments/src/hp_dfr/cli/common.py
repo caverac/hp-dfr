@@ -1,18 +1,31 @@
 """Shared CLI options and utilities."""
 
 from functools import wraps
-from typing import Callable, List
+from typing import Any, Callable, TypeVar
 
 import click
 from rich.console import Console
 from rich.table import Table
 
-
 console = Console()
 
+# TypeVar for Click command decorators that preserves function signature
+F = TypeVar("F", bound=Callable[..., Any])
 
-def common_options(func: Callable) -> Callable:
-    """Shared options for all run commands."""
+
+def common_options(func: F) -> F:
+    """Shared options for all run commands.
+
+    Parameters
+    ----------
+    func
+        The Click command function to decorate.
+
+    Returns
+    -------
+    F
+        The decorated function with common options added.
+    """
 
     @click.option(
         "--backend",
@@ -26,32 +39,54 @@ def common_options(func: Callable) -> Callable:
     @click.option("--output", default=None, help="Output file for results")
     @click.option("--plot/--no-plot", default=True, help="Show plots")
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         return func(*args, **kwargs)
 
-    return wrapper
+    return wrapper  # type: ignore[return-value]
 
 
-def network_options(default_layers: str = "64,64,64") -> Callable:
-    """Network architecture options with configurable default."""
+def network_options(default_layers: str = "64,64,64") -> Callable[[F], F]:
+    """Network architecture options with configurable default.
 
-    def decorator(func: Callable) -> Callable:
+    Parameters
+    ----------
+    default_layers
+        Default hidden layer sizes as comma-separated string.
+
+    Returns
+    -------
+    Callable[[F], F]
+        A decorator that adds the --hidden-layers option.
+    """
+
+    def decorator(func: F) -> F:
         @click.option(
             "--hidden-layers",
             default=default_layers,
             help="Hidden layer sizes (comma-separated)",
         )
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             return func(*args, **kwargs)
 
-        return wrapper
+        return wrapper  # type: ignore[return-value]
 
     return decorator
 
 
-def problem_option(func: Callable) -> Callable:
-    """Standard problem selection option."""
+def problem_option(func: F) -> F:
+    """Standard problem selection option.
+
+    Parameters
+    ----------
+    func
+        The Click command function to decorate.
+
+    Returns
+    -------
+    F
+        The decorated function with --problem option added.
+    """
 
     @click.option(
         "--problem",
@@ -60,15 +95,26 @@ def problem_option(func: Callable) -> Callable:
         help="Problem to solve",
     )
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         return func(*args, **kwargs)
 
-    return wrapper
+    return wrapper  # type: ignore[return-value]
 
 
-def parse_hidden_layers(hidden_layers: str) -> List[int]:
-    """Parse comma-separated layer sizes into list of integers."""
-    return [int(x.strip()) for x in hidden_layers.split(",")]
+def parse_hidden_layers(hidden_layers: str) -> tuple[int, ...]:
+    """Parse comma-separated layer sizes into list of integers.
+
+    Parameters
+    ----------
+    hidden_layers
+        Comma-separated string of layer sizes (e.g., "64,64,64").
+
+    Returns
+    -------
+    list[int]
+        List of integer layer sizes.
+    """
+    return tuple(int(x.strip()) for x in hidden_layers.split(","))
 
 
 def list_backends_table() -> None:
@@ -78,7 +124,7 @@ def list_backends_table() -> None:
     table.add_column("Status", style="green")
     table.add_column("Version", style="yellow")
 
-    backends = [
+    backends: list[tuple[str, str]] = [
         ("tensorflow", "tensorflow"),
         ("jax", "jax"),
         ("pytorch", "torch"),
@@ -87,7 +133,7 @@ def list_backends_table() -> None:
     for name, module in backends:
         try:
             mod = __import__(module)
-            version = getattr(mod, "__version__", "unknown")
+            version: str = getattr(mod, "__version__", "unknown")
             table.add_row(name, "[green]Available[/green]", version)
         except ImportError:
             table.add_row(name, "[red]Not installed[/red]", "-")
@@ -95,8 +141,14 @@ def list_backends_table() -> None:
     console.print(table)
 
 
-def list_problems_table(problems: dict) -> None:
-    """Display available problems in a table."""
+def list_problems_table(problems: dict[str, str]) -> None:
+    """Display available problems in a table.
+
+    Parameters
+    ----------
+    problems
+        Dictionary mapping problem names to descriptions.
+    """
     table = Table(title="Available Problems")
     table.add_column("Name", style="cyan")
     table.add_column("Description", style="green")
@@ -108,7 +160,7 @@ def list_problems_table(problems: dict) -> None:
 
 
 # Standard problem descriptions
-PROBLEM_DESCRIPTIONS = {
+PROBLEM_DESCRIPTIONS: dict[str, str] = {
     "sine": "Smooth sine solution (Model Problem 1)",
     "arctan": "Large gradients (Model Problem 2)",
     "discontinuous": "Discontinuous coefficients (Model Problem 3)",

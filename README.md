@@ -93,6 +93,20 @@ uv run python -m dfr_pinns
 yarn docs:dev
 ```
 
+### Upgrade Dependencies
+
+```bash
+uv lock --upgrade
+uv sync
+uv sync --extra pytorch
+```
+
+and 
+
+```bash
+yarn up "*"
+```
+
 ## Packages
 
 ### Preprint (`packages/preprint`)

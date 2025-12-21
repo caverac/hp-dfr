@@ -12,10 +12,17 @@ Reference:
 """
 
 __version__ = "0.1.0"
-__author__ = "MATHMODE Group"
+__author__ = "Carlos Vera-Ciro"
+
+import matplotlib
 
 from hp_dfr.models import PINNsModel, DFRModel
 from hp_dfr.problems import Poisson1D
+
+matplotlib.rcParams["font.family"] = "serif"
+matplotlib.rcParams["font.serif"] = ["Times New Roman", "Times", "DejaVu Serif"]
+matplotlib.rcParams["mathtext.fontset"] = "stix"
+
 
 __all__ = [
     "PINNsModel",
