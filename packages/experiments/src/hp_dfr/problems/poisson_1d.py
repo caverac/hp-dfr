@@ -133,8 +133,20 @@ class SineProblem(Poisson1D[None]):
 class ArcTanProblem(Poisson1D[float]):
     """Model Problem 2: Solution with large gradients.
 
-    Solves -u'' = f(x) on [0, 1] where the exact solution is
-    u(x) = arctan(k*(x - 0.5)), with k controlling the steepness.
+    Solves -u'' = f(x) on [0, 1] with homogeneous Dirichlet boundary
+    conditions u(0) = u(1) = 0.
+
+    We start from the steep profile
+
+        u_raw(x) = arctan(k * (x - 0.5))
+
+    and define the exact (boundary-satisfying) solution as
+
+        u(x) = u_raw(x) - l(x)
+
+    where l(x) is the unique affine function with l(0)=u_raw(0) and
+    l(1)=u_raw(1). Since l''(x)=0, the forcing f(x) = -u''(x) is identical
+    to the forcing computed from u_raw.
 
     This problem tests methods' ability to resolve sharp gradients.
     Standard PINNs struggle; DFR typically performs better.
@@ -170,14 +182,16 @@ class ArcTanProblem(Poisson1D[float]):
         Float64Array
             Values of the forcing function.
         """
+        a, b = self.domain
+        mid = 0.5 * (a + b)
         k = self.params
         return cast(
             Float64Array,
-            2.0 * k**3 * (x - 0.5) / (1.0 + k**2 * (x - 0.5) ** 2) ** 2,
+            2.0 * k**3 * (x - mid) / (1.0 + k**2 * (x - mid) ** 2) ** 2,
         )
 
     def exact_solution(self, x: Float64Array) -> Float64Array:
-        """Evaluate u(x) = arctan(k*(x - 0.5)).
+        """Evaluate the exact solution satisfying u(a)=u(b)=0.
 
         Parameters
         ----------
@@ -189,8 +203,17 @@ class ArcTanProblem(Poisson1D[float]):
         Float64Array
             Values of the exact solution.
         """
+        a, b = self.domain
+        mid = 0.5 * (a + b)
         k = self.params
-        return cast(Float64Array, np.arctan(k * (x - 0.5)))
+        u_raw = cast(Float64Array, np.arctan(k * (x - mid)))
+
+        # Subtract the affine function that matches boundary values, ensuring
+        # homogeneous Dirichlet boundary conditions.
+        u_a = float(np.arctan(k * (a - mid)))
+        u_b = float(np.arctan(k * (b - mid)))
+        l_x = u_a + (u_b - u_a) * (x - a) / (b - a)
+        return cast(Float64Array, u_raw - l_x)
 
 
 class DiscontinuousProblem(Poisson1D[tuple[float, float]]):

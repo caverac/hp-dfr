@@ -54,6 +54,10 @@ This work builds upon the Deep Fourier Residual method introduced in:
 
 The original DFR paper provides the theoretical foundation for using dual norm losses in physics-informed neural networks. Our work extends this framework with adaptive strategies to improve scalability and accuracy.
 
+### References
+
+- **Reference Implementation**: [PINNS-and-DFR-examples](https://github.com/Mathmode/PINNS-and-DFR-examples) - Benchmarking platform by the MATHMODE group comparing PINNs and DFR implementations in TensorFlow, JAX, and PyTorch.
+
 ## Repository Structure
 
 This monorepo contains four packages:

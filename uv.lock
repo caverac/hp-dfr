@@ -596,6 +596,12 @@ tensorflow = [
     { name = "tensorflow", version = "2.20.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1.8" },
@@ -614,6 +620,12 @@ requires-dist = [
     { name = "torch", marker = "(platform_machine != 'x86_64' and extra == 'pytorch') or (sys_platform != 'darwin' and extra == 'pytorch')", specifier = ">=2.5.1" },
 ]
 provides-extras = ["tensorflow", "jax", "pytorch", "all"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-cov", specifier = ">=5.0.0" },
+]
 
 [[package]]
 name = "hp-dfr-workspace"

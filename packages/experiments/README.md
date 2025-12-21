@@ -109,7 +109,10 @@ hp-dfr pinns run --problem sine --epochs 1000 --output results/sine_pinns.png
 
 ```bash
 # Install dev dependencies
-uv sync --extra dev
+uv sync --group dev
+
+# If you're using the PyTorch backend, include it when syncing
+uv sync --group dev --extra pytorch
 
 # Run tests
 pytest

@@ -109,6 +109,8 @@ def run(  # pylint: disable=too-many-positional-arguments
         hidden_layers=layers,
         backend=backend,
         seed=seed,
+        n_collocation=n_collocation,
+        bc_weight=bc_weight,
     )
 
     model.build()
@@ -175,7 +177,7 @@ def _plot_results(
         # Loss plot
         axs[1].semilogy(history["loss"], linewidth=2, color="black")
         axs[1].set_xlabel("Epoch")
-        axs[1].set_ylabel("Loss")
+        axs[1].set_ylabel(r"$L_2$")
         axs[1].grid(True, linestyle="-", alpha=0.7)
 
         axs[1].tick_params(which="minor", length=3, color="gray", direction="in")
