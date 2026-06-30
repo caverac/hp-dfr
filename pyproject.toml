@@ -95,6 +95,12 @@ load-plugins = [
 [tool.pylint.format]
 max-line-length = 140
 
+[tool.pylint.basic]
+# Short names that are idiomatic in this math/ML code (domain bounds, spatial
+# coordinates, indices, norms, tensors).
+good-names = ["a", "b", "d", "i", "j", "k", "m", "n", "u", "v", "x", "y", "z",
+              "L", "V", "M", "lo", "hi", "nn", "tf", "df", "fn"]
+
 [tool.pylint.messages_control]
 disable = [
     "C0114",  # missing-module-docstring
@@ -110,10 +116,21 @@ disable = [
 [tool.pylint.design]
 max-args = 10
 max-locals = 20
+max-positional-arguments = 12
+max-attributes = 15
+max-statements = 65
+
+[tool.pylint.typecheck]
+# Optional deep-learning backends: declared so pylint does not raise import-error
+# for modules that are intentionally not installed at lint time. They are imported
+# lazily (guarded) in the model modules.
+ignored-modules = ["tensorflow", "keras", "torch", "jax", "jax.numpy", "optax"]
 
 [tool.pydocstyle]
 convention = "numpy"
-add-ignore = ["D100", "D104", "D105", "D107"]
+# D406/D407: the codebase uses Google-style "Args:"/"Returns:" sections, which
+# do not carry the numpy-style dashed underline; accept them.
+add-ignore = ["D100", "D104", "D105", "D107", "D406", "D407"]
 match = '(?!test_).*\.py'
 match-dir = '(?!tests|node_modules|cdk\.out|packages/docs|packages/infra).*'
 

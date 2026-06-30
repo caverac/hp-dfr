@@ -9,10 +9,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'preprint/index',
         'preprint/literature-review',
-        'preprint/phase1-sparse-fourier',
-        'preprint/phase2-hp-adaptive',
         'preprint/phase3-goal-oriented',
-        'preprint/phase4-comprehensive',
       ],
     },
     {

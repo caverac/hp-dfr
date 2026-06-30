@@ -1,9 +1,43 @@
 """Deep Fourier Residual (DFR) method implementation."""
 
-from typing import Any, Dict, List
-import numpy as np
+import os
+from typing import Dict, List, Optional, Tuple, cast
 
-from hp_dfr.models.base import BaseModel
+import numpy as np
+from numpy.typing import NDArray
+
+from hp_dfr.models.base import BaseModel, Problem
+from hp_dfr.utils import console
+
+# Optional deep-learning backends, imported lazily (guarded) since only one is
+# needed at a time and each is heavy.
+os.environ.setdefault("KERAS_BACKEND", "tensorflow")
+try:
+    import keras
+    import tensorflow as tf
+except ImportError:  # backend not installed
+    keras = None
+    tf = None
+
+try:
+    import jax
+    import jax.numpy as jnp
+    import optax
+    from jax import grad, jit, random, vmap
+except ImportError:  # backend not installed
+    jax = None
+    jnp = None
+    optax = None
+    grad = jit = random = vmap = None
+
+try:
+    import torch
+    from torch import nn
+except ImportError:  # backend not installed
+    torch = None
+    nn = None
+
+ArrayF = NDArray[np.floating]
 
 
 class DFRModel(BaseModel):
@@ -28,7 +62,7 @@ class DFRModel(BaseModel):
 
     def __init__(
         self,
-        hidden_layers: List[int] = [10, 10, 10, 10],
+        hidden_layers: Tuple[int, ...] = (10, 10, 10, 10),
         activation: str = "tanh",
         dtype: str = "float64",
         seed: int = 1234,
@@ -47,14 +81,18 @@ class DFRModel(BaseModel):
             n_fourier_modes: Number of Fourier modes for H^-1 norm computation.
             backend: Deep learning backend ('tensorflow', 'jax', or 'pytorch').
         """
-        super().__init__(hidden_layers, activation, dtype, seed)
+        super().__init__(hidden_layers=hidden_layers, activation=activation, dtype=dtype, seed=seed)
         self.n_quadrature = n_quadrature
         self.n_fourier_modes = n_fourier_modes
         self.backend = backend
-        self._backend_module = None
-        self._dst_matrix = None
-        self._dct_matrix = None
-        self._h_minus_1_weights = None
+        # Precomputed arrays / backend handles, set lazily in build()/fit().
+        self._backend_module: object | None = None
+        self._domain: Optional[Tuple[float, float]] = None
+        self._dst_matrix: Optional[ArrayF] = None
+        self._dct_matrix: Optional[ArrayF] = None
+        self._h_minus_1_weights: Optional[ArrayF] = None
+        self._quadrature_pts: Optional[ArrayF] = None
+        self._raw_model: object | None = None
 
     def _compute_transform_matrices(self, domain: tuple) -> None:
         """Precompute DST and DCT matrices for Fourier transforms.
@@ -62,6 +100,7 @@ class DFRModel(BaseModel):
         Args:
             domain: Tuple (a, b) specifying the spatial domain.
         """
+        self._domain = domain
         a, b = domain
         L = b - a
 
@@ -72,20 +111,18 @@ class DFRModel(BaseModel):
 
         # H^-1 norm weights: (1 + k^2 * pi^2 / L^2)^-0.5
         k = np.arange(1, self.n_fourier_modes + 1)
-        self._h_minus_1_weights = ((np.pi ** 2 * k ** 2) / L ** 2) ** -0.5
+        self._h_minus_1_weights = ((np.pi**2 * k**2) / L**2) ** -0.5
 
         # DST matrix (Discrete Sine Transform)
         V = np.sqrt(2.0 / L)
-        self._dst_matrix = np.array([
-            V * np.sin(np.pi * ki * (self._quadrature_pts - a) / L) * h
-            for ki in range(1, self.n_fourier_modes + 1)
-        ])
+        self._dst_matrix = np.array(
+            [V * np.sin(np.pi * ki * (self._quadrature_pts - a) / L) * h for ki in range(1, self.n_fourier_modes + 1)]
+        )
 
         # DCT matrix with derivative (for gradient terms)
-        self._dct_matrix = np.array([
-            V * (ki * np.pi / L) * np.cos(np.pi * ki * (self._quadrature_pts - a) / L) * h
-            for ki in range(1, self.n_fourier_modes + 1)
-        ])
+        self._dct_matrix = np.array(
+            [V * (ki * np.pi / L) * np.cos(np.pi * ki * (self._quadrature_pts - a) / L) * h for ki in range(1, self.n_fourier_modes + 1)]
+        )
 
     def build(self, input_dim: int = 1, output_dim: int = 1) -> None:
         """Build the neural network with cutoff layer.
@@ -108,10 +145,9 @@ class DFRModel(BaseModel):
 
     def _build_tensorflow(self, input_dim: int, output_dim: int) -> None:
         """Build model using TensorFlow/Keras with cutoff layer."""
-        import os
-        os.environ["KERAS_BACKEND"] = "tensorflow"
+        if keras is None:
+            raise RuntimeError("TensorFlow backend requires tensorflow and keras.")
 
-        import keras
         keras.utils.set_random_seed(self.seed)
         keras.backend.set_floatx(self.dtype)
 
@@ -123,8 +159,8 @@ class DFRModel(BaseModel):
         for neurons in self.hidden_layers:
             x = keras.layers.Dense(neurons, activation=self.activation, dtype=self.dtype)(x)
 
-        # Output layer (with activation for DFR, before cutoff)
-        x = keras.layers.Dense(output_dim, activation=self.activation, dtype=self.dtype)(x)
+        # Linear output layer (no activation: the solution value is unbounded).
+        x = keras.layers.Dense(output_dim, activation=None, dtype=self.dtype)(x)
 
         # Store raw model (without cutoff) for internal use
         self._raw_model = keras.Model(inputs=inputs, outputs=x)
@@ -133,18 +169,17 @@ class DFRModel(BaseModel):
 
     def _build_jax(self, input_dim: int, output_dim: int) -> None:
         """Build model using JAX."""
-        import jax
-        import jax.numpy as jnp
-        from jax import random
+        if jax is None:
+            raise RuntimeError("JAX backend requires jax.")
 
         jax.config.update("jax_enable_x64", self.dtype == "float64")
 
-        layer_sizes = [input_dim] + self.hidden_layers + [output_dim]
+        layer_sizes = [input_dim, *self.hidden_layers, output_dim]
         key = random.PRNGKey(self.seed)
 
         params = []
-        for i, (m, n) in enumerate(zip(layer_sizes[:-1], layer_sizes[1:])):
-            key, w_key, b_key = random.split(key, 3)
+        for m, n in zip(layer_sizes[:-1], layer_sizes[1:]):
+            key, w_key, _b_key = random.split(key, 3)
             w = random.normal(w_key, (m, n)) * jnp.sqrt(2.0 / m)
             b = jnp.zeros(n)
             params.append({"w": w, "b": b})
@@ -154,8 +189,8 @@ class DFRModel(BaseModel):
 
     def _build_pytorch(self, input_dim: int, output_dim: int) -> None:
         """Build model using PyTorch."""
-        import torch
-        import torch.nn as nn
+        if torch is None:
+            raise RuntimeError("PyTorch backend requires torch.")
 
         torch.manual_seed(self.seed)
 
@@ -170,31 +205,34 @@ class DFRModel(BaseModel):
                 layers.append(nn.ReLU())
             prev_dim = neurons
 
-        # Output layer with activation (for DFR)
+        # Linear output layer: the solution value is unbounded, so no output
+        # activation (a bounded activation would cap the representable amplitude).
         layers.append(nn.Linear(prev_dim, output_dim))
-        if self.activation == "tanh":
-            layers.append(nn.Tanh())
 
-        self._model = nn.Sequential(*layers)
+        model = nn.Sequential(*layers)
         if self.dtype == "float64":
-            self._model = self._model.double()
+            model = model.double()
+        self._model = model
 
         self._backend_module = torch
 
     def fit(
         self,
-        problem: Any,
+        problem: Problem,
         epochs: int = 1000,
         learning_rate: float = 1e-3,
         verbose: bool = True,
+        lbfgs_iters: int = 0,
     ) -> Dict[str, List[float]]:
         """Train the model using DFR method.
 
         Args:
             problem: Problem instance with domain, forcing_fn, and boundary conditions.
-            epochs: Number of training iterations.
-            learning_rate: Learning rate for optimizer.
+            epochs: Number of Adam iterations.
+            learning_rate: Learning rate for Adam.
             verbose: Whether to print progress.
+            lbfgs_iters: If > 0, run an LBFGS polishing phase for this many
+                iterations after Adam (PyTorch backend only).
 
         Returns:
             Dictionary containing training history.
@@ -207,19 +245,20 @@ class DFRModel(BaseModel):
 
         if self.backend == "tensorflow":
             return self._fit_tensorflow(problem, epochs, learning_rate, verbose)
-        elif self.backend == "jax":
+        if self.backend == "jax":
             return self._fit_jax(problem, epochs, learning_rate, verbose)
-        elif self.backend == "pytorch":
-            return self._fit_pytorch(problem, epochs, learning_rate, verbose)
-        else:
-            raise ValueError(f"Unknown backend: {self.backend}")
+        if self.backend == "pytorch":
+            return self._fit_pytorch(problem, epochs, learning_rate, verbose, lbfgs_iters)
+        raise ValueError(f"Unknown backend: {self.backend}")
 
-    def _fit_tensorflow(
-        self, problem: Any, epochs: int, learning_rate: float, verbose: bool
-    ) -> Dict[str, List[float]]:
+    def _fit_tensorflow(self, problem: Problem, epochs: int, learning_rate: float, verbose: bool) -> Dict[str, List[float]]:
         """Train using TensorFlow with DFR loss."""
-        import tensorflow as tf
-        import keras
+        if keras is None:
+            raise RuntimeError("TensorFlow backend requires tensorflow and keras.")
+        assert self._model is not None
+        assert self._quadrature_pts is not None and self._dct_matrix is not None
+        assert self._h_minus_1_weights is not None and self._dst_matrix is not None
+        model = cast("keras.Model", self._model)
 
         optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
         domain = problem.domain
@@ -228,7 +267,6 @@ class DFRModel(BaseModel):
         # Convert matrices to tensors
         pts = tf.constant(self._quadrature_pts.reshape(-1, 1), dtype=self.dtype)
         dct_matrix = tf.constant(self._dct_matrix, dtype=self.dtype)
-        dst_matrix = tf.constant(self._dst_matrix, dtype=self.dtype)
         weights = tf.constant(self._h_minus_1_weights, dtype=self.dtype)
 
         # Precompute forcing term transform
@@ -239,14 +277,14 @@ class DFRModel(BaseModel):
         )
 
         @tf.function
-        def train_step():
+        def train_step() -> tf.Tensor:
             with tf.GradientTape() as tape:
                 # Compute u and its derivative at quadrature points
                 with tf.GradientTape() as t1:
                     t1.watch(pts)
                     # Apply cutoff layer: u = (x - a)(b - x) * nn(x)
                     cutoff = (pts - a) * (b - pts)
-                    nn_out = self._model(pts, training=True)
+                    nn_out = model(pts, training=True)
                     u = cutoff * nn_out
                 du = t1.gradient(u, pts)
 
@@ -254,13 +292,13 @@ class DFRModel(BaseModel):
                 ft_gradient = tf.einsum("ji,ij->j", dct_matrix, du)
 
                 # Total Fourier coefficients (weak residual)
-                ft_total = (ft_gradient + ft_forcing) * weights
+                ft_total = (ft_gradient - ft_forcing) * weights
 
                 # H^-1 norm squared (DFR loss)
-                loss = tf.reduce_sum(ft_total ** 2)
+                loss = tf.reduce_sum(ft_total**2)
 
-            gradients = tape.gradient(loss, self._model.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, self._model.trainable_variables))
+            gradients = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
             return loss
 
         self._history = {"loss": []}
@@ -270,20 +308,18 @@ class DFRModel(BaseModel):
             self._history["loss"].append(float(loss))
 
             if verbose and (epoch + 1) % 100 == 0:
-                print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
+                console.print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}", markup=False)
 
         return self._history
 
-    def _fit_jax(
-        self, problem: Any, epochs: int, learning_rate: float, verbose: bool
-    ) -> Dict[str, List[float]]:
+    def _fit_jax(self, problem: Problem, epochs: int, learning_rate: float, verbose: bool) -> Dict[str, List[float]]:
         """Train using JAX with DFR loss."""
-        import jax
-        import jax.numpy as jnp
-        from jax import grad, jit, vmap
-        import optax
+        if jax is None:
+            raise RuntimeError("JAX backend requires jax and optax.")
+        assert self._quadrature_pts is not None and self._dct_matrix is not None
+        assert self._h_minus_1_weights is not None and self._dst_matrix is not None
 
-        params = self._model
+        params = cast(list, self._model)
         optimizer = optax.adam(learning_rate)
         opt_state = optimizer.init(params)
         domain = problem.domain
@@ -297,20 +333,20 @@ class DFRModel(BaseModel):
         f_vals = problem.forcing_fn(self._quadrature_pts)
         ft_forcing = jnp.einsum("ji,i->j", self._dst_matrix, f_vals)
 
-        def forward(params, x):
-            for i, layer in enumerate(params[:-1]):
+        def forward(params: list, x: "jax.Array") -> "jax.Array":
+            for layer in params[:-1]:
                 x = jnp.tanh(x @ layer["w"] + layer["b"])
             # Last layer with activation for DFR
             x = jnp.tanh(x @ params[-1]["w"] + params[-1]["b"])
             return x
 
-        def forward_with_cutoff(params, x):
+        def forward_with_cutoff(params: list, x: "jax.Array") -> "jax.Array":
             cutoff = (x - a) * (b - x)
             return cutoff * forward(params, x)
 
-        def loss_fn(params):
+        def loss_fn(params: list) -> "jax.Array":
             # Compute derivatives using vmap
-            def u_scalar(xi):
+            def u_scalar(xi: "jax.Array") -> "jax.Array":
                 return forward_with_cutoff(params, xi.reshape(1, -1))[0, 0]
 
             du_dx = vmap(grad(u_scalar))
@@ -318,12 +354,12 @@ class DFRModel(BaseModel):
 
             # Fourier transform
             ft_gradient = jnp.einsum("ji,i->j", dct_matrix, du)
-            ft_total = (ft_gradient + ft_forcing) * weights
+            ft_total = (ft_gradient - ft_forcing) * weights
 
-            return jnp.sum(ft_total ** 2)
+            return jnp.sum(ft_total**2)
 
         @jit
-        def train_step(params, opt_state):
+        def train_step(params: list, opt_state: "optax.OptState") -> tuple:
             loss, grads = jax.value_and_grad(loss_fn)(params)
             updates, opt_state = optimizer.update(grads, opt_state, params)
             params = optax.apply_updates(params, updates)
@@ -336,64 +372,80 @@ class DFRModel(BaseModel):
             self._history["loss"].append(float(loss))
 
             if verbose and (epoch + 1) % 100 == 0:
-                print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
+                console.print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}", markup=False)
 
         self._model = params
         return self._history
 
     def _fit_pytorch(
-        self, problem: Any, epochs: int, learning_rate: float, verbose: bool
+        self,
+        problem: Problem,
+        epochs: int,
+        learning_rate: float,
+        verbose: bool,
+        lbfgs_iters: int = 0,
     ) -> Dict[str, List[float]]:
-        """Train using PyTorch with DFR loss."""
-        import torch
+        """Train using PyTorch with DFR loss (Adam, optional LBFGS polish)."""
+        if torch is None:
+            raise RuntimeError("PyTorch backend requires torch.")
+        assert self._model is not None
+        assert self._quadrature_pts is not None and self._dct_matrix is not None
+        assert self._h_minus_1_weights is not None and self._dst_matrix is not None
+        model = cast("torch.nn.Module", self._model)
 
-        optimizer = torch.optim.Adam(self._model.parameters(), lr=learning_rate)
         domain = problem.domain
         a, b = domain
         dtype = torch.float64 if self.dtype == "float64" else torch.float32
 
-        pts = torch.tensor(
-            self._quadrature_pts.reshape(-1, 1), dtype=dtype, requires_grad=True
-        )
+        pts = torch.tensor(self._quadrature_pts.reshape(-1, 1), dtype=dtype, requires_grad=True)
         dct_matrix = torch.tensor(self._dct_matrix, dtype=dtype)
         weights = torch.tensor(self._h_minus_1_weights, dtype=dtype)
 
         # Precompute forcing term transform
         f_vals = problem.forcing_fn(self._quadrature_pts)
-        ft_forcing = torch.tensor(
-            np.einsum("ji,i->j", self._dst_matrix, f_vals), dtype=dtype
-        )
+        ft_forcing = torch.tensor(np.einsum("ji,i->j", self._dst_matrix, f_vals), dtype=dtype)
+
+        def compute_loss() -> torch.Tensor:
+            # Fresh leaf tensor so the input-gradient graph is rebuilt each call.
+            x = pts.detach().clone().requires_grad_(True)
+            cutoff = (x - a) * (b - x)
+            u = cutoff * model(x)
+            du = torch.autograd.grad(u, x, grad_outputs=torch.ones_like(u), create_graph=True)[0]
+            ft_gradient = torch.einsum("ji,ij->j", dct_matrix, du)
+            ft_total = (ft_gradient - ft_forcing) * weights
+            return torch.sum(ft_total**2)
 
         self._history = {"loss": []}
 
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for epoch in range(epochs):
             optimizer.zero_grad()
-
-            # Need fresh tensor for gradient computation
-            x = pts.detach().clone().requires_grad_(True)
-
-            # Apply cutoff and forward pass
-            cutoff = (x - a) * (b - x)
-            nn_out = self._model(x)
-            u = cutoff * nn_out
-
-            # Compute derivative
-            du = torch.autograd.grad(
-                u, x, grad_outputs=torch.ones_like(u), create_graph=True
-            )[0]
-
-            # Fourier transform
-            ft_gradient = torch.einsum("ji,ij->j", dct_matrix, du)
-            ft_total = (ft_gradient + ft_forcing) * weights
-
-            loss = torch.sum(ft_total ** 2)
+            loss = compute_loss()
             loss.backward()
             optimizer.step()
-
             self._history["loss"].append(float(loss))
-
             if verbose and (epoch + 1) % 100 == 0:
-                print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
+                console.print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}", markup=False)
+
+        if lbfgs_iters > 0:
+            lbfgs = torch.optim.LBFGS(
+                model.parameters(),
+                max_iter=lbfgs_iters,
+                line_search_fn="strong_wolfe",
+                history_size=50,
+            )
+
+            def closure() -> torch.Tensor:
+                lbfgs.zero_grad()
+                loss = compute_loss()
+                loss.backward()
+                return loss
+
+            lbfgs.step(closure)
+            final = float(compute_loss())
+            self._history["loss"].append(final)
+            if verbose:
+                console.print(f"LBFGS polish - Loss: {final:.6e}", markup=False)
 
         return self._history
 
@@ -409,33 +461,32 @@ class DFRModel(BaseModel):
         if x.ndim == 1:
             x = x.reshape(-1, 1)
 
-        # Note: We need the domain to apply cutoff
-        # This assumes predict is called after fit
-        a, b = 0, np.pi  # Default domain, should be stored from problem
+        # Cutoff must use the same domain the model was trained on.
+        if self._domain is None:
+            raise ValueError("Model not trained yet; call fit() before predict().")
+        a, b = self._domain
 
         if self.backend == "tensorflow":
+            model = cast("keras.Model", self._model)
             cutoff = (x - a) * (b - x)
-            nn_out = self._model(x, training=False).numpy()
-            return (cutoff * nn_out).flatten()
-        elif self.backend == "jax":
-            import jax.numpy as jnp
+            nn_out = model(x, training=False).numpy()
+            return cast(np.ndarray, (cutoff * nn_out).flatten())
+        if self.backend == "jax":
 
-            def forward(params, x):
+            def forward(params: list, x: "jax.Array") -> "jax.Array":
                 for layer in params[:-1]:
                     x = jnp.tanh(x @ layer["w"] + layer["b"])
                 return jnp.tanh(x @ params[-1]["w"] + params[-1]["b"])
 
             cutoff = (x - a) * (b - x)
-            nn_out = np.array(forward(self._model, x))
-            return (cutoff * nn_out).flatten()
-        elif self.backend == "pytorch":
-            import torch
-
+            nn_out = np.array(forward(cast(list, self._model), x))
+            return cast(np.ndarray, (cutoff * nn_out).flatten())
+        if self.backend == "pytorch":
+            model = cast("torch.nn.Module", self._model)
             dtype = torch.float64 if self.dtype == "float64" else torch.float32
             x_tensor = torch.tensor(x, dtype=dtype)
             cutoff = (x_tensor - a) * (b - x_tensor)
             with torch.no_grad():
-                nn_out = self._model(x_tensor)
-            return (cutoff * nn_out).numpy().flatten()
-        else:
-            raise ValueError(f"Unknown backend: {self.backend}")
+                nn_out = model(x_tensor)
+            return cast(np.ndarray, (cutoff * nn_out).numpy().flatten())
+        raise ValueError(f"Unknown backend: {self.backend}")

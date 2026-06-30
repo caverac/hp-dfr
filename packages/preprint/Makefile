@@ -1,50 +1,41 @@
-# Makefile for LaTeX preprint
+# Makefile for the single-file LaTeX manuscript (ms.tex).
 
-# Main document
-MAIN = main
-LATEX = pdflatex
+MS     = ms
+LATEX  = pdflatex -interaction=nonstopmode
 BIBTEX = bibtex
 
-# Default target
-all: $(MAIN).pdf
+# Figures are generated into the project-root assets directory (by
+# `uv run hp-dfr figures` in packages/experiments) and synced in here for the
+# build. The local copies are git-ignored; assets/ is the source of truth.
+ASSETS = ../../assets
+FIGS   = $(notdir $(wildcard $(ASSETS)/*.pdf))
 
-# Build PDF
-$(MAIN).pdf: $(MAIN).tex sections/*.tex references.bib
-	$(LATEX) $(MAIN)
-	$(BIBTEX) $(MAIN)
-	$(LATEX) $(MAIN)
-	$(LATEX) $(MAIN)
+all: $(MS).pdf
 
-# Quick build (no bibtex)
-quick:
-	$(LATEX) $(MAIN)
+# Copy figure PDFs from assets into the preprint directory.
+.PHONY: figures
+figures:
+	@cp -f $(ASSETS)/*.pdf .
 
-# Clean auxiliary files
+$(MS).pdf: $(MS).tex references.bib figures
+	$(LATEX) $(MS)
+	$(BIBTEX) $(MS)
+	$(LATEX) $(MS)
+	$(LATEX) $(MS)
+
+.PHONY: clean
 clean:
 	rm -f *.aux *.bbl *.blg *.log *.out *.toc *.lof *.lot *.fls *.fdb_latexmk *.synctex.gz
-	rm -f sections/*.aux
+	rm -f $(FIGS)
 
-# Clean everything including PDF
+.PHONY: distclean
 distclean: clean
-	rm -f $(MAIN).pdf
+	rm -f $(MS).pdf
 
-# Watch for changes and rebuild
-watch:
-	@echo "Watching for changes..."
-	@while true; do \
-		inotifywait -qre modify,create,delete . 2>/dev/null || fswatch -1 . 2>/dev/null || sleep 5; \
-		make quick; \
-	done
+.PHONY: open
+open: $(MS).pdf
+	open $(MS).pdf
 
-# Open PDF (macOS)
-open: $(MAIN).pdf
-	open $(MAIN).pdf
-
-# Check for common LaTeX issues
+.PHONY: check
 check:
-	@echo "Checking for common issues..."
-	@grep -n "TODO" sections/*.tex main.tex || echo "No TODOs found"
-	@grep -n "FIXME" sections/*.tex main.tex || echo "No FIXMEs found"
-	@grep -n "\\\cite{}" sections/*.tex main.tex || echo "No empty citations"
-
-.PHONY: all quick clean distclean watch open check
+	@grep -n "TODO\|FIXME" $(MS).tex || echo "No TODOs found"

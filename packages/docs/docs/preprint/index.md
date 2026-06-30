@@ -3,303 +3,88 @@ sidebar_position: 1
 sidebar_label: Overview
 ---
 
-# Our Research: Adaptive hp-DFR
+# Our Research: Goal-Oriented DFR
 
-This section documents our research extending the Deep Fourier Residual method with adaptive hp-refinement and goal-oriented error control.
+This project extends the Deep Fourier Residual (DFR) method with **goal-oriented
+error control**: instead of minimizing the global $H^{-1}$ residual norm, we
+weight the loss toward a specific **quantity of interest (QoI)** using a
+dual-weighted residual (DWR) formulation.
 
-## The New Idea
+## The idea
 
-We propose extending the Deep Fourier Residual method with **adaptive hp-refinement** driven by **goal-oriented error estimation**. This combines three key innovations:
+The original DFR method ([arXiv:2210.14129](https://arxiv.org/abs/2210.14129))
+minimizes the $H^{-1}$ dual norm of the weak residual, which is equivalent to
+the $H^1$ energy-norm error for well-posed problems. In many applications,
+however, the goal is not the global error but a functional of the solution: a
+point value $u(x_0)$, a subdomain average, or a boundary flux.
 
-1. **Adaptive Fourier Mode Selection**: Instead of using a fixed truncation of Fourier modes, dynamically select modes based on their contribution to the residual norm. This addresses the curse of dimensionality mentioned in the original paper.
-
-2. **Hierarchical Neural Network Architecture (hp-refinement)**: Use a multi-scale network where:
-   - **h-refinement**: Partition the domain and use local networks in regions requiring higher resolution
-   - **p-refinement**: Adaptively increase network depth/width in regions with smooth solutions
-
-3. **Goal-Oriented Error Estimation**: For quantities of interest (QoI), compute the dual-weighted residual to focus computational effort where it affects the output most.
-
-## Why Is It Novel?
-
-The original DFR paper ([arXiv:2210.14129](https://arxiv.org/abs/2210.14129)) establishes that the $H^{-1}$ dual norm loss is equivalent to the $H^1$ error for well-posed problems. However, several limitations remain:
-
-### Limitations Addressed
-
-| Limitation | Original DFR | Our Approach |
-|------------|--------------|--------------|
-| **Curse of dimensionality** | $O(N^d)$ Fourier modes required | Sparse tensor methods: $O(N(\log N)^{d-1})$ |
-| **Uniform refinement** | Same modes everywhere | hp-adaptivity focuses resolution where needed |
-| **Energy norm mismatch** | $H^{-1}$ may not control energy error | Goal-oriented estimation targets QoI directly |
-| **Fixed architecture** | Single network for entire domain | Domain decomposition with local networks |
-
-### Novel Contributions
-
-- First integration of hp-adaptivity with DFR-style dual norm losses
-- Theoretical analysis of how adaptive mode selection affects error-loss equivalence
-- Goal-oriented loss functions for physics-informed learning
-- Sparse tensor Fourier methods to break the curse of dimensionality
-
-## Key Research Questions
-
-### Question 1: Adaptive Fourier Mode Selection
-
-**Can we maintain error-loss equivalence while using only $O(N \log N)$ modes instead of $O(N^d)$?**
-
-We investigate sparse tensor product Fourier spaces where modes $(k_1, \ldots, k_d)$ satisfy:
+We train a **primal network** $u_h$ and an **adjoint network** $z_h$ together,
+and minimize a QoI-weighted residual functional
 
 $$
-\sum_{i=1}^{d} \log(1 + k_i) \leq M
+\mathcal{L}_{\text{QoI}}(u_h) = |\langle R(u_h), z_h \rangle|,
 $$
 
-instead of the full tensor product. This reduces complexity from $O(N^d)$ to $O(N(\log N)^{d-1})$.
+so that error control focuses on the QoI. The adjoint network is what makes this
+dual-norm-of-a-QoI-residual computable in the DFR setting.
 
-**Numerical component:**
-- Implement sparse DST/DCT via hierarchical evaluation
-- Compare accuracy vs. computational cost against full DFR
-- Test on 2D, 3D, and higher-dimensional Poisson problems
+## Why this scope (and not more)
 
-**Theoretical component:**
-- Prove that for solutions in mixed Sobolev spaces, the truncation error is controlled
-- Establish error bounds for sparse mode approximation of the dual norm
+This project was originally scoped around three combined extensions (sparse
+Fourier modes, hp-adaptive domain decomposition, and goal-oriented DFR). A
+viability review (see the session log `notebooks/notes/logs/20260629-idea-reframing.md`)
+narrowed it to goal-oriented DFR alone:
 
-### Question 2: hp-Adaptive Neural Network Architecture
+- **Sparse Fourier modes** are explicitly signposted as future work by the DFR
+  authors, the $O(N (\log N)^{d-1})$ speedup claim is not sound for a
+  non-separable neural-network residual (the real cost is autodiff/quadrature,
+  not the mode count), and sparse truncation breaks the two-sided error-loss
+  equivalence. High risk, low novelty.
+- **hp-adaptive domain decomposition** is largely pre-empted by
+  [arXiv:2401.04663](https://arxiv.org/abs/2401.04663) (Adaptive DFR via
+  overlapping domain decomposition), which already does local DFR losses, Dorfler
+  marking, and residual-based refinement with equivalence theory.
+- **Goal-oriented DFR** is the least pre-empted: while goal-oriented PINNs exist,
+  pairing DWR specifically with the DFR $H^{-1}$ dual-norm loss appears
+  unoccupied. This is the defensible novel core.
 
-**Can domain decomposition with local networks improve efficiency for problems with localized features?**
+## The publishable unit
 
-For problems with localized singularities, boundary layers, or discontinuous coefficients:
-- Partition $\Omega$ into subdomains $\Omega_j$ with local networks $u_j$
-- Use the DFR loss locally: $\mathcal{L}_j = \|R(u_j)\|_{H^{-1}(\Omega_j)}$
-- Couple subdomains via mortar/interface conditions
+A single-contribution paper, **Goal-Oriented Deep Fourier Residual Methods**,
+targeting CMAME / JCP (the DFR family's home). The acceptance gate in that venue
+is a theorem, not just experiments: a goal-oriented analogue of DFR's error-loss
+equivalence, stating that the QoI-weighted dual-norm loss controls
+$|J(u) - J(u_h)|$.
 
-**Numerical component:**
-- Implement h-adaptive DFR with automatic subdivision based on local residual indicators
-- Test on: (a) L-shaped domain with corner singularity, (b) problems with internal layers, (c) discontinuous diffusion coefficients
-- Compare against single-network DFR
+See the [Goal-Oriented DFR plan](/docs/preprint/phase3-goal-oriented) for the
+DWR framework, the theorem targets, and the experiment plan, and the
+[Literature Review](/docs/preprint/literature-review) for prior art and
+positioning.
 
-**Theoretical component:**
-- Analyze stability of the coupled system
-- Prove that local error indicators form a reliable and efficient a posteriori estimator
-
-### Question 3: Goal-Oriented DFR
-
-**Can dual-weighted residuals focus the loss on quantities of interest?**
-
-Instead of minimizing $\|R(u)\|_{H^{-1}}$, minimize a weighted loss:
-
-$$
-\mathcal{L}_{\text{QoI}}(u) = |\langle R(u), z \rangle|
-$$
-
-where $z$ is the adjoint solution corresponding to the QoI.
-
-**Numerical component:**
-- Implement simultaneous primal-adjoint neural network training
-- Test on: (a) point evaluation problems, (b) average flux computations, (c) eigenvalue problems
-- Demonstrate that QoI-targeted training requires fewer DOF than global error minimization
-
-**Theoretical component:**
-- Establish that $\mathcal{L}_{\text{QoI}}$ controls the error in the quantity of interest
-- Analyze convergence rates for goal-oriented DFR
-
-## Implementation Steps
-
-Use this checklist to track progress as you develop the paper. Each phase builds on the previous one.
-
-### Phase 1: Sparse Fourier Methods
-
-#### 1.1 Literature Review
-- [x] Review sparse grid methods (Bungartz & Griebel, Acta Numerica 2004)
-- [x] Study hyperbolic cross approximation theory
-- [x] Review existing sparse FFT implementations
-- [x] Document relevant error estimates for sparse tensor products
-
-See [Literature Review](/docs/preprint/literature-review) for details.
-
-#### 1.2 Implementation
-- [x] Implement sparse index set generation for hyperbolic cross
-- [x] Implement hierarchical DST/DCT evaluation
-- [x] Create unit tests comparing against full DST/DCT
-- [ ] Benchmark computational complexity vs. full tensor product
-
-**Implementation files**:
-- `dfr_pinns/fourier/sparse_indices.py` - Hyperbolic cross, Smolyak indices
-- `dfr_pinns/fourier/transforms.py` - DST/DCT transforms, H^{-1} weights
-- `dfr_pinns/models/sparse_dfr.py` - SparseDFRModel class
-- `tests/test_sparse_fourier.py` - Comprehensive unit tests
-
-#### 1.3 Validation Experiments
-- [ ] 2D Poisson with smooth solution (verify no accuracy loss)
-- [ ] 2D Poisson with corner singularity
-- [ ] 3D Poisson problem
-- [ ] 4D+ problems to demonstrate scaling
-
-#### 1.4 Theory
-- [ ] Prove error bound for sparse dual norm approximation
-- [ ] Establish conditions for error-loss equivalence preservation
-- [ ] Write up theoretical results for paper
-
-### Phase 2: hp-Adaptive Architecture
-
-#### 2.1 Literature Review
-- [x] Review domain decomposition methods for PDEs
-- [x] Study mortar element methods
-- [x] Review hp-FEM error estimation strategies
-- [x] Survey neural network domain decomposition approaches (hp-VPINNs, AB-PINNs, AS-PINNs)
-
-See [Literature Review](/docs/preprint/literature-review) for details.
-
-#### 2.2 Implementation
-- [x] Implement domain partitioning infrastructure
-- [x] Create local network architecture with interface coupling
-- [x] Implement local DFR loss computation
-- [x] Add residual-based refinement indicators
-- [x] Implement automatic h-refinement strategy
-
-**Implementation files**:
-- `dfr_pinns/domain/partitioning.py` - BoundingBox, RectangularPartition, AdaptivePartition
-- `dfr_pinns/domain/subdomain.py` - Subdomain, SubdomainNetwork, SubdomainCollection
-- `dfr_pinns/domain/interface.py` - Interface, PenaltyCoupling, MortarCoupling
-- `dfr_pinns/domain/refinement.py` - RefinementIndicator, mark_for_refinement
-- `dfr_pinns/models/hp_dfr.py` - HPDFRModel class
-- `tests/test_hp_adaptive.py` - Comprehensive unit tests
-
-#### 2.3 Validation Experiments
-- [ ] 1D problem with internal layer
-- [ ] 2D L-shaped domain (corner singularity)
-- [ ] 2D problem with discontinuous diffusion coefficient
-- [ ] Compare DOF vs. accuracy against single-network DFR
-
-#### 2.4 Theory
-- [ ] Analyze stability of coupled multi-network system
-- [ ] Prove reliability of local error indicators
-- [ ] Prove efficiency of local error indicators
-- [ ] Write up theoretical results for paper
-
-### Phase 3: Goal-Oriented Training
-
-#### 3.1 Literature Review
-- [x] Review dual-weighted residual (DWR) methods
-- [x] Study goal-oriented adaptivity in FEM
-- [x] Review adjoint methods in deep learning (DWR-DNN, E2N, SA-PINN)
-- [x] Document relevant error representation formulas
-
-See [Literature Review](/docs/preprint/literature-review) for details.
-
-#### 3.2 Implementation
-- [x] Implement adjoint network architecture
-- [x] Create simultaneous primal-adjoint training loop
-- [x] Implement goal-oriented loss function
-- [x] Add QoI error estimation
-
-**Implementation files**:
-- `dfr_pinns/models/goal_oriented_dfr.py` - GoalOrientedDFRModel, QoI classes
-- `tests/test_goal_oriented.py` - Comprehensive unit tests
-
-**Supported QoI types**:
-- PointEvaluationQoI - Point evaluation u(x₀)
-- AverageValueQoI - Average over subdomain
-- BoundaryFluxQoI - Normal flux through boundary segment
-
-#### 3.3 Validation Experiments
-- [ ] Point evaluation QoI (1D and 2D)
-- [ ] Average flux QoI
-- [ ] Boundary integral QoI
-- [ ] Compare DOF vs. QoI accuracy against global DFR
-
-#### 3.4 Theory
-- [ ] Prove error representation formula for neural network approximations
-- [ ] Establish QoI error bounds
-- [ ] Analyze convergence rates
-- [ ] Write up theoretical results for paper
-
-### Phase 4: Comprehensive Study
-
-#### 4.1 Combined Methods
-- [ ] Integrate sparse Fourier with hp-adaptivity
-- [ ] Integrate goal-oriented estimation with hp-adaptivity
-- [ ] Test full adaptive hp-DFR framework
-
-#### 4.2 Benchmark Problems
-- [ ] High-frequency Helmholtz equation
-- [ ] Reaction-diffusion with boundary layers
-- [ ] Interface problems with discontinuous coefficients
-- [ ] Higher-dimensional problems (d ≥ 4)
-
-#### 4.3 Comparison Study
-- [ ] Compare against standard PINNs
-- [ ] Compare against standard DFR
-- [ ] Compare against VPINNs
-- [ ] Document computational cost vs. accuracy trade-offs
-
-### Phase 5: Paper Writing
-
-#### 5.1 Drafting
-- [ ] Write introduction and motivation
-- [ ] Write methodology section
-- [ ] Write theoretical results section
-- [ ] Write numerical experiments section
-- [ ] Write conclusions
-
-#### 5.2 Figures and Tables
-- [ ] Create convergence plots
-- [ ] Create architecture diagrams
-- [ ] Create comparison tables
-- [ ] Create computational cost figures
-
-#### 5.3 Finalization
-- [ ] Internal review
-- [ ] Address reviewer comments
-- [ ] Prepare supplementary material
-- [ ] Submit to arXiv
-
-## Numerical Experiments Plan
-
-| Experiment | Dimension | Problem Type | Focus | Phase |
-|------------|-----------|--------------|-------|-------|
-| Sparse modes validation | 2D, 3D | Smooth Poisson | Curse of dimensionality | 1 |
-| High-dimensional scaling | 4D, 6D | Poisson | Sparse tensor efficiency | 1 |
-| Corner singularity | 2D | L-domain Poisson | hp-adaptivity | 2 |
-| Internal layer | 1D, 2D | Reaction-diffusion | h-adaptivity | 2 |
-| Discontinuous σ | 2D | Elliptic interface | Local DFR | 2 |
-| Point evaluation | 1D, 2D | Various | Goal-oriented | 3 |
-| Average flux | 2D | Diffusion | Goal-oriented | 3 |
-| High-frequency Helmholtz | 1D, 2D | Wave equation | Alternative norms | 4 |
-
-## Current Status
+## Status
 
 | Component | Status |
 |-----------|--------|
-| Literature review | **Complete** - see [Literature Review](/docs/preprint/literature-review) |
-| Sparse Fourier implementation | **Complete** - Phase 1.2 |
-| hp-adaptive architecture | **Complete** - Phase 2.2 |
-| Goal-oriented training | **Complete** - Phase 3.2 |
-| Unit tests | **Complete** - 3 test files |
-| Validation experiments | Not started - Phases 1.3, 2.3, 3.3 |
-| Theoretical framework | Not started - Phases 1.4, 2.4, 3.4 |
-| Paper draft | Not started - Phase 5 |
+| Goal-oriented model + QoI classes | Implemented (`models/goal_oriented_dfr.py`); QoI classes unit-tested |
+| Dense DFR Fourier machinery | Implemented and tested (`fourier/transforms.py`) |
+| 1D Poisson problems | Implemented (`problems/poisson_1d.py`) |
+| End-to-end goal-oriented training run | Validated in 1D (point QoI; L2 rel err ~1.9%, QoI err ~6e-3) |
+| QoI-error-control theorem | **Proved** (Prop. 4.2 + Thm 4.3 in preprint, M1 done) |
+| 2D problems, FEM-DWR baselines | Not started (M3) |
 
-## Related Pages
-
-- [Original DFR Method](/docs/theory/dfr) - Background on the Deep Fourier Residual approach
-- [Background: Original DFR](/docs/paper/summary) - Summary of the original publication we build upon
-- [Method Comparison](/docs/theory/comparison) - How DFR compares to PINNs
+See the [Roadmap](/docs/preprint/phase3-goal-oriented#roadmap) for the sequenced
+plan (M1-M4) and risks.
 
 ## References
 
-Key references for this research (see [Literature Review](/docs/preprint/literature-review) for comprehensive list):
-
-### DFR Methods
-1. Taylor, J.M., Pardo, D., Muga, I. (2022). A Deep Fourier Residual Method for solving PDEs using Neural Networks. [arXiv:2210.14129](https://arxiv.org/abs/2210.14129)
-2. Taylor, J.M., et al. (2024). Adaptive Deep Fourier Residual method via overlapping domain decomposition. [arXiv:2401.04663](https://arxiv.org/abs/2401.04663)
-
-### Adaptive Methods
-3. Kharazmi, E., Zhang, Z., Karniadakis, G.E. (2021). hp-VPINNs: Variational physics-informed neural networks with domain decomposition. [ScienceDirect](https://www.sciencedirect.com/science/article/abs/pii/S0045782520307325)
-4. Burrows, L., Chen, W., Sherif, M. (2025). AB-PINNs: Adaptive-Basis Physics-Informed Neural Networks. [arXiv:2510.08924](https://arxiv.org/abs/2510.08924)
-
-### Goal-Oriented Error Estimation
-5. Endtmayer, B., Langer, U., Wick, T. (2021). Multigoal-oriented dual-weighted-residual error estimation using deep neural networks. [arXiv:2112.11360](https://arxiv.org/abs/2112.11360)
-6. Becker, R., Rannacher, R. (2001). An optimal control approach to a posteriori error estimation in finite element methods. Acta Numerica, 10, 1-102.
-
-### Classical References
-7. Bungartz, H.J., Griebel, M. (2004). Sparse grids. Acta Numerica, 13, 147-269.
-8. Schwab, C. (1998). p- and hp-Finite Element Methods. Oxford University Press.
+1. Taylor, J.M., Pardo, D., Muga, I. (2023). A Deep Fourier Residual Method for
+   solving PDEs using Neural Networks. CMAME 405:115850.
+   [arXiv:2210.14129](https://arxiv.org/abs/2210.14129)
+2. Taylor, J.M., Bastidas, M., Calo, V.M., Pardo, D. (2024). Adaptive Deep
+   Fourier Residual method via overlapping domain decomposition. CMAME.
+   [arXiv:2401.04663](https://arxiv.org/abs/2401.04663)
+3. Chakraborty, A., Wick, T., Zhuang, X., Rabczuk, T. (2021/2025).
+   Multigoal-oriented dual-weighted-residual error estimation using deep neural
+   networks. [arXiv:2112.11360](https://arxiv.org/abs/2112.11360)
+4. Becker, R., Rannacher, R. (2001). An optimal control approach to a posteriori
+   error estimation in finite element methods. Acta Numerica, 10, 1-102.

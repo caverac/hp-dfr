@@ -6,7 +6,7 @@ and (when available) an exact solution.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, TypeVar, Generic, cast
+from typing import Generic, TypeAlias, TypeVar, Union, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -347,7 +347,15 @@ class DeltaProblem(Poisson1D[float]):
         )
 
 
-def get_problem(name: str) -> Poisson1D[Any]:
+#: Union over the concrete 1D Poisson problems, by their parameter type.
+PoissonProblem: TypeAlias = Union[
+    Poisson1D[None],
+    Poisson1D[float],
+    Poisson1D[tuple[float, float]],
+]
+
+
+def get_problem(name: str) -> PoissonProblem:
     """Get a problem instance by name.
 
     Parameters
@@ -357,7 +365,7 @@ def get_problem(name: str) -> Poisson1D[Any]:
 
     Returns
     -------
-    Poisson1D[Any]
+    PoissonProblem
         The requested problem instance with default parameters.
 
     Raises
@@ -371,7 +379,7 @@ def get_problem(name: str) -> Poisson1D[Any]:
     >>> x = np.linspace(*problem.domain, 100)
     >>> u = problem.exact_solution(x)
     """
-    problems: dict[str, Poisson1D[Any]] = {
+    problems: dict[str, PoissonProblem] = {
         "sine": SineProblem(),
         "arctan": ArcTanProblem(),
         "discontinuous": DiscontinuousProblem(),

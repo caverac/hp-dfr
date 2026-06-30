@@ -3,116 +3,100 @@ name: CI
 on:
   pull_request:
     branches: [main]
-  push:
-    branches: [main]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  NODE_VERSION: '22'
+  PYTHON_VERSION: '3.12'
+
+permissions:
+  contents: read
 
 jobs:
-  # =============================================================================
-  # Python Code Quality
-  # =============================================================================
+  # ===========================================================================
+  # Python (experiments) -- quality checks (run in parallel)
+  # ===========================================================================
 
-  py-format:
-    name: Python Format
+  lint-python:
+    name: Lint (Python)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
-      - name: Set up Python
-        run: uv python install 3.11
+      - name: Setup Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Check formatting with black
-        run: uv run black --check packages/experiments/
+      - name: Check formatting (black)
+        run: uv run black --check packages/experiments/src packages/experiments/tests
 
-      - name: Check import sorting with isort
-        run: uv run isort --check-only packages/experiments/
+      - name: Check import order (isort)
+        run: uv run isort --check-only packages/experiments/src packages/experiments/tests
 
-  py-lint:
-    name: Python Lint
+      - name: Lint (flake8)
+        run: uv run flake8 packages/experiments/src packages/experiments/tests
+
+      - name: Lint (pylint)
+        run: uv run pylint packages/experiments/src
+
+      - name: Docstrings (pydocstyle)
+        run: uv run pydocstyle packages/experiments/src
+
+  typecheck-python:
+    name: Typecheck (Python)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
-      - name: Set up Python
-        run: uv python install 3.11
+      - name: Setup Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Flake8
-        run: uv run flake8 packages/experiments/
+      - name: Run mypy
+        run: uv run mypy packages/experiments/src
 
-      - name: Pylint
-        run: uv run pylint packages/experiments/src/
-
-      - name: Pydocstyle
-        run: uv run pydocstyle packages/experiments/src/
-
-  py-typecheck:
-    name: Python Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.11
-
-      - name: Install dependencies
-        run: uv sync --frozen
-
-      - name: Mypy
-        run: uv run mypy packages/experiments/src/
-
-  py-test:
-    name: Python Tests
+  test-python:
+    name: Test (Python)
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Setup Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: uv sync --frozen
 
       - name: Run tests
-        run: uv run pytest packages/experiments/tests/
+        run: uv run pytest packages/experiments/tests
 
-  # =============================================================================
-  # TypeScript Code Quality
-  # =============================================================================
+  # ===========================================================================
+  # TypeScript (docs + infra) -- quality checks (run in parallel)
+  # ===========================================================================
 
-  ts-format:
-    name: TypeScript Format
+  lint-js:
+    name: Lint (JS/TS)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -120,27 +104,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install dependencies
-        run: yarn install --immutable
-
-      - name: Check formatting with Prettier
-        run: yarn format
-
-  ts-lint:
-    name: TypeScript Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Enable Corepack
         run: corepack enable
@@ -151,8 +115,11 @@ jobs:
       - name: ESLint
         run: yarn lint
 
-  ts-typecheck:
-    name: TypeScript Type Check
+      - name: Prettier
+        run: yarn format
+
+  build-infra:
+    name: Build (Infra)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -160,7 +127,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Enable Corepack
         run: corepack enable
@@ -168,25 +135,64 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Type check (build docs + infra)
-        run: yarn typecheck
+      - name: Build infra (tsc)
+        run: yarn infra:build
 
-  ts-test:
-    name: TypeScript Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install dependencies
-        run: yarn install --immutable
-
-      - name: Run Jest tests
+      - name: Test infra (jest)
         run: yarn infra:test
+
+  build-docs:
+    name: Build (Docs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build docs site
+        run: yarn docs:build
+
+  # ===========================================================================
+  # Preprint (LaTeX) -- regenerate the figure and compile the manuscript
+  # ===========================================================================
+
+  build-preprint:
+    name: Build (Preprint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Setup Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Regenerate figures from saved data
+        run: uv run hp-dfr figures
+
+      - name: Install TeX Live
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base texlive-latex-recommended texlive-latex-extra \
+            texlive-publishers texlive-science texlive-fonts-recommended \
+            texlive-bibtex-extra
+
+      - name: Compile manuscript
+        working-directory: packages/preprint
+        run: make

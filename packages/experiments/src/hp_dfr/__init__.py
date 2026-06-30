@@ -1,5 +1,4 @@
-"""
-DFR-PINNs: Physics-Informed Neural Networks and Deep Fourier Residual Methods
+"""Physics-Informed Neural Networks and Deep Fourier Residual methods for PDEs.
 
 A comprehensive implementation of PINNs and DFR methods for solving PDEs,
 with support for TensorFlow, JAX, and PyTorch backends.
@@ -16,7 +15,7 @@ __author__ = "Carlos Vera-Ciro"
 
 import matplotlib
 
-from hp_dfr.models import PINNsModel, DFRModel
+from hp_dfr.models import DFRModel, PINNsModel
 from hp_dfr.problems import Poisson1D
 
 matplotlib.rcParams["font.family"] = "serif"

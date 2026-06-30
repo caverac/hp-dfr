@@ -4,9 +4,20 @@ Reference paper: "A Deep Fourier Residual Method for solving PDEs using Neural N
 """
 
 import os
+from pathlib import Path
 
 import click
 import numpy as np
+import numpy.typing as npt
+from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from matplotlib.ticker import AutoMinorLocator
+
+from hp_dfr.models import DFRModel
+from hp_dfr.models.base import Problem
+from hp_dfr.problems import poisson_1d
+from hp_dfr.types.common import BackendType, ProblemTypes
 
 from .common import (
     PROBLEM_DESCRIPTIONS,
@@ -20,25 +31,22 @@ from .common import (
 
 
 @click.group()
-def dfr():
+def dfr() -> None:
     """Deep Fourier Residual method (reference paper).
 
     DFR uses a variational formulation with the H^{-1} dual norm computed
     via Discrete Sine/Cosine Transforms for error-equivalent loss functions.
 
-    \b
     Key characteristics:
     - Uses weak-form residual in H^{-1} norm
     - Loss is equivalent to actual error (up to constants)
     - Only requires H^1 regularity (vs H^2 for PINNs)
     - Deterministic quadrature (no random collocation)
 
-    \b
     Reference:
     Taylor et al., "A Deep Fourier Residual Method for solving PDEs
     using Neural Networks", CMAME 2023.
     """
-    pass
 
 
 @dfr.command()
@@ -56,25 +64,22 @@ def dfr():
     help="Number of quadrature points for integration",
 )
 def run(
-    problem,
-    backend,
-    epochs,
-    lr,
-    hidden_layers,
-    n_modes,
-    n_quadrature,
-    seed,
-    output,
-    plot,
-):
+    problem: ProblemTypes,
+    backend: BackendType,
+    epochs: int,
+    lr: float,
+    hidden_layers: str,
+    n_modes: int,
+    n_quadrature: int,
+    seed: int,
+    output: str,
+    plot: bool,
+) -> None:
     """Run a DFR experiment.
 
     Train a neural network using the Deep Fourier Residual method,
     computing loss in the H^{-1} dual norm via DST/DCT.
     """
-    from hp_dfr.models import DFRModel
-    from hp_dfr.problems import poisson_1d
-
     console.print(f"[bold blue]Running DFR on {problem} problem[/bold blue]")
     console.print(f"Backend: {backend}, Epochs: {epochs}, LR: {lr}")
     console.print(f"Fourier modes: {n_modes}, Quadrature points: {n_quadrature}")
@@ -102,11 +107,11 @@ def run(
         console.print(f"\n[bold green]L2 Error: {l2_error:.6e}[/bold green]")
 
     if plot:
-        _plot_results(x_test, u_pred, prob, history, "DFR", output)
+        _plot_results(x_test, u_pred, prob, history, output=Path(output) if output else None)
 
 
 @dfr.command()
-def problems():
+def problems() -> None:
     """List available problems for DFR experiments."""
     list_problems_table(PROBLEM_DESCRIPTIONS)
 
@@ -119,10 +124,11 @@ def problems():
 )
 @click.option(
     "--problems",
+    "problem_spec",
     default="all",
     help="Problems to reproduce (comma-separated or 'all')",
 )
-def reproduce(output_dir, problems):
+def reproduce(output_dir: str, problem_spec: str) -> None:
     """Reproduce results from the reference DFR paper.
 
     Runs the benchmark problems from the original paper with the same
@@ -133,10 +139,11 @@ def reproduce(output_dir, problems):
 
     os.makedirs(output_dir, exist_ok=True)
 
-    if problems == "all":
-        problem_list = list(PROBLEM_DESCRIPTIONS.keys())
+    problem_list: list[str]
+    if problem_spec == "all":
+        problem_list = [str(p) for p in PROBLEM_DESCRIPTIONS]
     else:
-        problem_list = [p.strip() for p in problems.split(",")]
+        problem_list = [p.strip() for p in problem_spec.split(",")]
 
     console.print(f"Problems: {', '.join(problem_list)}")
 
@@ -167,38 +174,49 @@ def reproduce(output_dir, problems):
     console.print(f"\n[green]Results will be saved to {output_dir}/[/green]")
 
 
-def _plot_results(x_test, u_pred, prob, history, method_name, output):
+def _plot_results(
+    x_test: npt.NDArray[np.float64],
+    u_pred: npt.NDArray[np.float64],
+    prob: Problem,
+    history: dict[str, list[float]],
+    /,
+    *,
+    output: Path | None = None,
+) -> None:
     """Plot solution and training history."""
-    try:
-        import matplotlib.pyplot as plt
+    fig: Figure
+    axs: list[Axes]
+    fig, axs = plt.subplots(2, 1, figsize=(6, 6))
 
-        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    fig.subplots_adjust(left=0.1, right=0.98, bottom=0.1, top=0.92, wspace=0.15, hspace=0.05)
 
-        # Solution plot
-        axes[0].plot(x_test, u_pred, "b-", label="Predicted", linewidth=2)
-        if prob.exact_solution is not None:
-            u_exact = prob.exact_solution(x_test)
-            axes[0].plot(x_test, u_exact, "r--", label="Exact", linewidth=2)
-        axes[0].set_xlabel("x")
-        axes[0].set_ylabel("u(x)")
-        axes[0].set_title(f"{method_name} Solution")
-        axes[0].legend()
-        axes[0].grid(True, linestyle=":", alpha=0.7)
+    # Solution plot
+    axs[0].plot(x_test, u_pred, color="black", linestyle="-", label="Predicted", linewidth=3)
+    u_exact = prob.exact_solution(x_test)
+    axs[0].plot(x_test, u_exact, color="gray", linestyle="--", label="Exact", linewidth=2)
+    axs[0].set_xlabel("$x$")
+    axs[0].set_ylabel("$u(x)$")
+    axs[0].xaxis.set_minor_locator(AutoMinorLocator())
+    axs[0].yaxis.set_minor_locator(AutoMinorLocator())
+    axs[0].legend(frameon=False)
+    axs[0].grid(True, linestyle="-", alpha=0.7)
+    axs[0].tick_params(which="minor", length=3, color="gray", direction="in")
+    axs[0].tick_params(which="major", length=6, direction="in")
+    axs[0].tick_params(top=True, right=True, which="both")
 
-        # Loss plot
-        axes[1].semilogy(history["loss"], linewidth=2)
-        axes[1].set_xlabel("Epoch")
-        axes[1].set_ylabel("Loss (H⁻¹ norm)")
-        axes[1].set_title("Training Loss")
-        axes[1].grid(True, linestyle=":", alpha=0.7)
+    # Loss plot
+    axs[1].semilogy(history["loss"], linewidth=2, color="black")
+    axs[1].set_xlabel("Epoch")
+    axs[1].set_ylabel(r"$\|R\|_{H^{-1}}$")
+    axs[1].grid(True, linestyle="-", alpha=0.7)
+    axs[1].tick_params(which="minor", length=3, color="gray", direction="in")
+    axs[1].tick_params(which="major", length=6, direction="in")
+    axs[1].tick_params(top=True, right=True, which="both")
 
-        plt.tight_layout()
+    plt.tight_layout()
 
-        if output:
-            plt.savefig(output, dpi=150)
-            console.print(f"[green]Saved plot to {output}[/green]")
-        else:
-            plt.show()
-
-    except ImportError:
-        console.print("[yellow]matplotlib not available, skipping plots[/yellow]")
+    if output:
+        plt.savefig(output, dpi=150)
+        console.print(f"[green]Saved plot to {output}[/green]")
+    else:
+        plt.show()

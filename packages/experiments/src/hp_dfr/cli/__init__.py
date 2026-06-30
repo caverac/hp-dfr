@@ -1,14 +1,14 @@
-"""Command-line interface for hp-DFR experiments.
+"""Command-line interface for the DFR experiments.
 
-This module provides a structured CLI with subcommands for different experiment types:
-- pinns: Physics-Informed Neural Networks experiments
-- dfr: Deep Fourier Residual method (reference paper reproduction)
-- research: Adaptive hp-DFR methods (our new research)
-
-Legacy commands are preserved for backwards compatibility but are deprecated.
+Subcommands:
+- pinns: Physics-Informed Neural Networks baseline.
+- dfr: Deep Fourier Residual method (reference paper reproduction).
+- research: Goal-Oriented DFR (this project's contribution).
 """
 
 import click
+
+from hp_dfr.figures import make_all_figures
 
 from .common import list_backends_table
 from .dfr import dfr
@@ -19,14 +19,12 @@ from .research import research
 @click.group()
 @click.version_option()
 def main() -> None:
-    """hp-DFR: Adaptive hp-refinement Deep Fourier Residual Methods.
-
-    A toolkit for solving PDEs using neural networks with multiple methods:
+    r"""Deep Fourier Residual experiments: baselines and Goal-Oriented DFR.
 
     \b
-    hp-dfr pinns run ...       PINNs experiments
+    hp-dfr pinns run ...       PINNs baseline
     hp-dfr dfr run ...         DFR reference paper
-    hp-dfr research run ...    Our hp-DFR research
+    hp-dfr research run ...    Goal-Oriented DFR
     hp-dfr backends            List available backends
     """
 
@@ -41,6 +39,12 @@ main.add_command(research)
 def backends() -> None:
     """List available deep learning backends and their status."""
     list_backends_table()
+
+
+@main.command()
+def figures() -> None:
+    """Build the preprint figures from saved experiment data."""
+    make_all_figures()
 
 
 # Export main for entry point

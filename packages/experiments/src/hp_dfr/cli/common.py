@@ -1,19 +1,22 @@
 """Shared CLI options and utilities."""
 
 from functools import wraps
-from typing import Any, Callable, TypeVar
+from typing import Callable, ParamSpec, TypeVar
 
 import click
 from rich.console import Console
 from rich.table import Table
 
+from hp_dfr.types.common import ProblemTypes
+
 console = Console()
 
-# TypeVar for Click command decorators that preserves function signature
-F = TypeVar("F", bound=Callable[..., Any])
+# Preserve the decorated command's signature through the Click option wrappers.
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
-def common_options(func: F) -> F:
+def common_options(func: Callable[P, R]) -> Callable[P, R]:
     """Shared options for all run commands.
 
     Parameters
@@ -23,7 +26,7 @@ def common_options(func: F) -> F:
 
     Returns
     -------
-    F
+    Callable[P, R]
         The decorated function with common options added.
     """
 
@@ -39,13 +42,13 @@ def common_options(func: F) -> F:
     @click.option("--output", default=None, help="Output file for results")
     @click.option("--plot/--no-plot", default=True, help="Show plots")
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(*args, **kwargs)
 
-    return wrapper  # type: ignore[return-value]
+    return wrapper
 
 
-def network_options(default_layers: str = "64,64,64") -> Callable[[F], F]:
+def network_options(default_layers: str = "64,64,64") -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Network architecture options with configurable default.
 
     Parameters
@@ -55,27 +58,27 @@ def network_options(default_layers: str = "64,64,64") -> Callable[[F], F]:
 
     Returns
     -------
-    Callable[[F], F]
+    Callable[[Callable[P, R]], Callable[P, R]]
         A decorator that adds the --hidden-layers option.
     """
 
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @click.option(
             "--hidden-layers",
             default=default_layers,
             help="Hidden layer sizes (comma-separated)",
         )
         @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             return func(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 
 
-def problem_option(func: F) -> F:
-    """Standard problem selection option.
+def problem_option(func: Callable[P, R]) -> Callable[P, R]:
+    """Add the standard problem selection option to a command.
 
     Parameters
     ----------
@@ -84,7 +87,7 @@ def problem_option(func: F) -> F:
 
     Returns
     -------
-    F
+    Callable[P, R]
         The decorated function with --problem option added.
     """
 
@@ -95,10 +98,10 @@ def problem_option(func: F) -> F:
         help="Problem to solve",
     )
     @wraps(func)
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         return func(*args, **kwargs)
 
-    return wrapper  # type: ignore[return-value]
+    return wrapper
 
 
 def parse_hidden_layers(hidden_layers: str) -> tuple[int, ...]:
@@ -141,7 +144,7 @@ def list_backends_table() -> None:
     console.print(table)
 
 
-def list_problems_table(problems: dict[str, str]) -> None:
+def list_problems_table(problems: dict[ProblemTypes, str]) -> None:
     """Display available problems in a table.
 
     Parameters
@@ -160,7 +163,7 @@ def list_problems_table(problems: dict[str, str]) -> None:
 
 
 # Standard problem descriptions
-PROBLEM_DESCRIPTIONS: dict[str, str] = {
+PROBLEM_DESCRIPTIONS: dict[ProblemTypes, str] = {
     "sine": "Smooth sine solution (Model Problem 1)",
     "arctan": "Large gradients (Model Problem 2)",
     "discontinuous": "Discontinuous coefficients (Model Problem 3)",

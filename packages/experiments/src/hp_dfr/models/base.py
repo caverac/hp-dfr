@@ -5,12 +5,25 @@ for all neural network PDE solvers, including PINNs and DFR variants.
 """
 
 from abc import ABC, abstractmethod
-from typing import Callable, Any, Literal
+from typing import Callable, Protocol
 
 import numpy as np
 import numpy.typing as npt
 
-from hp_dfr.problems.poisson_1d import Poisson1D
+from hp_dfr.types.common import NormType
+from hp_dfr.utils import console
+
+
+class Problem(Protocol):
+    """Structural interface of a PDE problem used by the models."""
+
+    domain: tuple
+
+    def forcing_fn(self, x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        """Evaluate the forcing term at points ``x``."""
+
+    def exact_solution(self, x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        """Evaluate the exact solution at points ``x``."""
 
 
 class BaseModel(ABC):
@@ -61,7 +74,9 @@ class BaseModel(ABC):
         self.activation = activation
         self.dtype = dtype
         self.seed = seed
-        self._model = None
+        # The built backend network (keras.Model, torch.nn.Module, or JAX
+        # params). Backend-agnostic here; subclasses cast to the concrete type.
+        self._model: object | None = None
         self._history: dict[str, list[float]] = {"loss": [], "h1_error": []}
 
     @abstractmethod
@@ -79,7 +94,7 @@ class BaseModel(ABC):
     @abstractmethod
     def fit(
         self,
-        problem: Poisson1D[Any],
+        problem: Problem,
         epochs: int = 1000,
         learning_rate: float = 1e-3,
         verbose: bool = True,
@@ -88,7 +103,7 @@ class BaseModel(ABC):
 
         Parameters
         ----------
-        problem : Poisson1D[Any]
+        problem : Problem
             Problem instance defining the PDE to solve.
         epochs : int, optional
             Number of training iterations, by default 1000.
@@ -124,7 +139,7 @@ class BaseModel(ABC):
         exact_solution: Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]],
         /,
         *,
-        norm: Literal["l2", "h1"] = "l2",
+        norm: NormType = "l2",
     ) -> float:
         """Compute error between prediction and exact solution.
 
@@ -134,7 +149,7 @@ class BaseModel(ABC):
             Points at which to evaluate the error.
         exact_solution : Callable[[npt.NDArray[np.float64]], npt.NDArray[np.float64]]
             Function that returns the exact solution at given points.
-        norm : {'l2', 'h1'}, optional
+        norm : NormType, optional
             Error norm to use, by default 'l2'.
 
         Returns
@@ -157,8 +172,7 @@ class BaseModel(ABC):
         if norm == "l2":
             return float(np.sqrt(np.mean((u_pred - u_exact) ** 2)))
         if norm == "h1":
-            # For H1 norm, would need gradient computation
-            # Simplified L2 error for now
+            # TODO: For H1 norm, would need gradient computation, using L2 error for now
             return float(np.sqrt(np.mean((u_pred - u_exact) ** 2)))
 
         raise ValueError(f"Unknown norm: {norm}")
@@ -182,9 +196,9 @@ class BaseModel(ABC):
         built yet, prints a message indicating this.
         """
         if self._model is not None:
-            print(f"Model: {self.__class__.__name__}")
-            print(f"Hidden layers: {self.hidden_layers}")
-            print(f"Activation: {self.activation}")
-            print(f"Dtype: {self.dtype}")
+            console.print(f"Model: {self.__class__.__name__}", markup=False)
+            console.print(f"Hidden layers: {self.hidden_layers}", markup=False)
+            console.print(f"Activation: {self.activation}", markup=False)
+            console.print(f"Dtype: {self.dtype}", markup=False)
         else:
-            print("Model not built yet. Call build() first.")
+            console.print("Model not built yet. Call build() first.", markup=False)

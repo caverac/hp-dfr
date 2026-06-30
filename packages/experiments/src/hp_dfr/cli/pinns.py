@@ -1,12 +1,7 @@
-# pyright: reportUnknownMemberType=false
-"""PINNs (Physics-Informed Neural Networks) CLI subcommands.
-
-The pyright directive above suppresses "Type of X is partially unknown" warnings
-caused by incomplete type stubs in matplotlib (specifically plt.subplots).
-"""
+"""PINNs (Physics-Informed Neural Networks) CLI subcommands."""
 
 from pathlib import Path
-from typing import Any, Literal
+
 import click
 import numpy as np
 import numpy.typing as npt
@@ -16,7 +11,9 @@ from matplotlib.figure import Figure
 from matplotlib.ticker import AutoMinorLocator
 
 from hp_dfr.models import PINNsModel
+from hp_dfr.models.base import Problem
 from hp_dfr.problems import poisson_1d
+from hp_dfr.types.common import BackendType
 
 from .common import (
     PROBLEM_DESCRIPTIONS,
@@ -57,9 +54,9 @@ def pinns() -> None:
     default=100.0,
     help="Boundary condition penalty weight (lambda)",
 )
-def run(  # pylint: disable=too-many-positional-arguments
+def run(
     problem: str,
-    backend: Literal["tensorflow", "jax", "pytorch"],
+    backend: BackendType,
     epochs: int,
     lr: float,
     hidden_layers: str,
@@ -97,7 +94,6 @@ def run(  # pylint: disable=too-many-positional-arguments
     plot : bool
         Whether to generate plots of the solution and training history
     """
-
     console.print(f"[bold blue]Running PINNs on {problem} problem[/bold blue]")
     console.print(f"Backend: {backend}, Epochs: {epochs}, LR: {lr}")
     console.print(f"Collocation points: {n_collocation}, BC weight: {bc_weight}")
@@ -138,7 +134,7 @@ def problems() -> None:
 def _plot_results(
     x_test: npt.NDArray[np.float64],
     u_pred: npt.NDArray[np.float64],
-    prob: poisson_1d.Poisson1D[Any],
+    prob: Problem,
     history: dict[str, list[float]],
     /,
     *,

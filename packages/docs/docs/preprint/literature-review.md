@@ -169,7 +169,7 @@ where $z$ is the adjoint solution and $R$ is the residual.
 
 ### 3.2 Multigoal-Oriented DWR with DNNs (2021-2025)
 
-Endtmayer et al. explored using neural networks to compute adjoints for goal-oriented error estimation.
+Chakraborty, Wick, Zhuang, and Rabczuk explored using neural networks to compute adjoints for goal-oriented error estimation.
 
 **Key Findings**:
 - Neural networks can approximate adjoint solutions with 2-3 hidden layers
@@ -317,32 +317,37 @@ SA-PINN: Local sensitivity analysis via loss function regularization.
 
 ---
 
-## 8. Research Gaps Identified
+## 8. Research gap addressed (post-scoping)
 
-Based on this literature review, we identify the following gaps that our hp-DFR research addresses:
+A viability review (June 2026; see
+`notebooks/notes/logs/20260629-idea-reframing.md`) narrowed this project to a
+single gap. The two discarded directions and the reason:
 
-### Gap 1: No Combined hp-DFR Framework
-While Adaptive DFR (domain decomposition) and hp-VPINNs exist separately, no work combines:
-- DFR-style dual norm losses
-- hp-adaptive refinement
-- Sparse Fourier methods
+- **Sparse / hyperbolic-cross DFR** is signposted as future work by the DFR
+  authors, the $O(N (\log N)^{d-1})$ speedup is unsound for a non-separable
+  neural-network residual, and sparse truncation breaks the two-sided
+  error-loss equivalence. Discarded.
+- **hp-adaptive / domain-decomposition DFR** is largely pre-empted by Adaptive
+  DFR (arXiv:2401.04663), which already provides local DFR losses, Dorfler
+  marking, residual-based refinement, and equivalence theory. Discarded as a
+  flagship; the only daylight (local networks + mortar coupling + 3D) is narrow.
 
-### Gap 2: Goal-Oriented DFR
-Existing goal-oriented methods use standard PINN losses or FEM. No work applies:
-- DWR to DFR-style losses
-- Adjoint-based refinement indicators for Fourier methods
+### The gap we address: Goal-Oriented DFR
 
-### Gap 3: Sparse Tensor DFR
-While sparse grid methods are well-established in classical numerics, application to:
-- DFR loss computation
-- Adaptive mode selection
-remains unexplored.
+Existing goal-oriented neural methods either use strong-form PINN/Deep Ritz
+losses (Chakraborty-Wick-Zhuang-Rabczuk; Govoeyi-Richter) or classical FEM
+(Becker-Rannacher). **No work applies the dual-weighted residual to the DFR
+$H^{-1}$ dual-norm loss specifically** - i.e., a QoI-weighted dual-norm residual
+functional $|\langle R(u), z \rangle|$ where the dual norm is computed a la DFR.
+This is the defensible novel core.
 
-### Gap 4: Theoretical Analysis
-Need for:
-- Error-loss equivalence proofs with sparse modes
-- Stability analysis for coupled multi-network DFR
-- Convergence rates for goal-oriented DFR
+### Theory required
+- A goal-oriented analogue of DFR's error-loss equivalence: the QoI-weighted
+  dual-norm loss controls $|J(u) - J(u_h)|$.
+
+Note on positioning: "goal-oriented PINN" broadly, and "training primal and
+adjoint networks together," are already published and must be cited as prior art
+we extend - not claimed as novel.
 
 ---
 
@@ -362,7 +367,7 @@ Need for:
 
 ### Goal-Oriented Error Estimation
 
-5. Endtmayer, B., Langer, U., Wick, T. (2021). Multigoal-oriented dual-weighted-residual error estimation using deep neural networks. [arXiv:2112.11360](https://arxiv.org/abs/2112.11360)
+5. Chakraborty, A., Wick, T., Zhuang, X., Rabczuk, T. (2021/2025). Multigoal-oriented dual-weighted-residual error estimation using deep neural networks. [arXiv:2112.11360](https://arxiv.org/abs/2112.11360), DOI 10.1007/s44379-025-00012-4
 
 6. Kakranian, M., Rasooli, M. (2022). Neural network guided adjoint computations in dual weighted residual error estimation. [Springer](https://link.springer.com/article/10.1007/s42452-022-04938-9)
 

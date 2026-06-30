@@ -1,14 +1,13 @@
-# Adaptive hp-DFR: Goal-Oriented Deep Fourier Residual Methods
+# Goal-Oriented Deep Fourier Residual Methods
 
-This repository contains the implementation and experiments for extending the Deep Fourier Residual (DFR) method with **adaptive hp-refinement** and **goal-oriented error estimation** for solving PDEs using neural networks.
+This repository contains the implementation and experiments for extending the Deep Fourier Residual (DFR) method with **goal-oriented error control** for solving PDEs using neural networks.
 
 **Full documentation**: [https://caverac.github.io/hp-dfr](https://caverac.github.io/hp-dfr)
 
 ## Table of Contents
 
 - [Our Research](#our-research)
-  - [Why Is This Novel?](#why-is-this-novel)
-  - [Key Research Questions](#key-research-questions)
+  - [Key Idea](#key-idea)
 - [Background: The Deep Fourier Residual Method](#background-the-deep-fourier-residual-method)
 - [Repository Structure](#repository-structure)
 - [Quick Start](#quick-start)
@@ -18,31 +17,16 @@ This repository contains the implementation and experiments for extending the De
 
 ## Our Research
 
-We propose a novel extension to the Deep Fourier Residual method that combines three key innovations:
+We extend the Deep Fourier Residual method with **goal-oriented error control**. Instead of minimizing the global H⁻¹ residual norm, we apply the dual-weighted residual (DWR) framework to the DFR loss: a primal network and an adjoint network are trained together, and the loss is the QoI-weighted residual functional `|<R(u), z>|`, evaluated with the same spectral machinery DFR uses for the H⁻¹ norm.
 
-1. **Adaptive Fourier Mode Selection**: Instead of using a fixed truncation of Fourier modes, dynamically select modes based on their contribution to the residual norm, addressing the curse of dimensionality.
+### Key Idea
 
-2. **Hierarchical Neural Network Architecture (hp-refinement)**: Use a multi-scale network with h-refinement (domain partitioning with local networks) and p-refinement (adaptive network depth/width).
+The original DFR method establishes that the H⁻¹ dual-norm loss is equivalent to the H¹ error for well-posed problems. That controls the *global* error. For a quantity of interest (QoI) -- a point value, a subdomain average, a boundary flux -- this control is indirect. Goal-oriented DFR targets the QoI directly.
 
-3. **Goal-Oriented Error Estimation**: For quantities of interest (QoI), compute the dual-weighted residual to focus computational effort where it affects the output most.
+- **Contribution**: pairing DWR with the DFR H⁻¹ dual-norm loss specifically (distinct from existing goal-oriented PINN/Deep Ritz work).
+- **Acceptance gate (theory)**: a goal-oriented analogue of the DFR error-loss equivalence, i.e., the QoI-weighted loss controls `|J(u) - J(u_h)|`.
 
-### Why Is This Novel?
-
-The original DFR method establishes that the H⁻¹ dual norm loss is equivalent to the H¹ error for well-posed problems. Our approach addresses key limitations:
-
-- **Curse of dimensionality**: DFR requires O(Nᵈ) Fourier modes in d dimensions. Our sparse tensor methods reduce this to O(N(log N)^(d-1)).
-- **Uniform refinement inefficiency**: Standard DFR uses the same number of modes everywhere. hp-adaptivity focuses resolution where needed.
-- **Energy norm mismatch**: For certain PDEs (e.g., Helmholtz), H⁻¹ may not control the energy-norm error. Goal-oriented estimation directly targets quantities of interest.
-
-This is the first integration of hp-adaptivity and goal-oriented error estimation with DFR-style dual norm losses for physics-informed learning.
-
-### Key Research Questions
-
-1. **Adaptive Fourier Mode Selection**: Can we maintain error-loss equivalence while using only O(N log N) modes instead of O(Nᵈ)? We investigate sparse tensor product Fourier spaces and prove error bounds for sparse mode approximation.
-
-2. **hp-Adaptive Neural Network Architecture**: Can domain decomposition with local networks improve efficiency for problems with localized features? We implement h-adaptive DFR with automatic subdivision based on local residual indicators.
-
-3. **Goal-Oriented DFR**: Can dual-weighted residuals focus the loss on quantities of interest? We implement simultaneous primal-adjoint neural network training and establish that the goal-oriented loss controls the error in the QoI.
+> The project was originally scoped around three combined extensions (sparse Fourier modes, hp-adaptive domain decomposition, goal-oriented DFR). A June 2026 viability review narrowed it to goal-oriented DFR alone; the rationale (prior art, technical soundness, venue requirements) is recorded in `notebooks/notes/logs/20260629-idea-reframing.md`.
 
 ## Background: The Deep Fourier Residual Method
 
@@ -91,7 +75,8 @@ yarn install
 # Run experiments (see packages/experiments/README.md)
 cd packages/experiments
 uv sync
-uv run python -m dfr_pinns
+uv run hp-dfr --help
+uv run hp-dfr research run --problem sine --qoi point
 
 # Start documentation site
 yarn docs:dev
@@ -115,11 +100,11 @@ yarn up "*"
 
 ### Preprint (`packages/preprint`)
 
-LaTeX source for the research paper presenting our adaptive hp-DFR method.
+LaTeX source for the research paper presenting our goal-oriented DFR method.
 
 ### Experiments (`packages/experiments`)
 
-Python package implementing the adaptive hp-DFR methods with TensorFlow, JAX, and PyTorch backends. Includes benchmarks comparing against standard DFR and PINNs.
+Python package implementing goal-oriented DFR with TensorFlow and PyTorch backends, plus DFR and PINN baselines for comparison.
 
 ### Documentation (`packages/docs`)
 

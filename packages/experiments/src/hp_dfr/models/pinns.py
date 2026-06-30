@@ -1,33 +1,9 @@
-# pylint: disable=import-outside-toplevel, import-error
-# pyright: reportMissingImports=false, reportUnknownMemberType=false, reportUnknownVariableType=false, reportUntypedFunctionDecorator=false
-# pyright: reportCallIssue=false, reportUnknownArgumentType=false, reportAttributeAccessIssue=false
-# type: ignore[attr-defined]
 """Physics-Informed Neural Networks (PINNs) implementation.
 
 This module provides a multi-backend PINNs implementation supporting TensorFlow,
 JAX, and PyTorch. The backends are optional dependencies - only the backend you
-choose to use needs to be installed.
-
-Linter Exceptions
------------------
-The pylint and pyright directives at the top of this file are required because:
-
-1. **Optional backends**: TensorFlow, JAX, and PyTorch are optional dependencies.
-   Users only need to install the backend they intend to use. This means imports
-   like ``import keras`` or ``import torch`` may fail on systems where that
-   backend is not installed.
-
-2. **Deferred imports**: Backend imports are done inside methods (not at module
-   level) to avoid import errors when the backend is not installed. This triggers
-   ``import-outside-toplevel`` warnings.
-
-3. **Missing type stubs**: These deep learning frameworks either lack type stubs
-   or have incomplete stubs, causing ``reportUnknownMemberType`` and similar
-   warnings from Pyright.
-
-Without these exceptions, the linter would report errors for any backend that
-is not currently installed, even though the code is correct and will work
-when the appropriate backend is available.
+choose to use needs to be installed, so they are imported lazily inside the
+backend-specific methods.
 
 Examples
 --------
@@ -39,13 +15,44 @@ Examples
 >>> history = model.fit(problem, epochs=1000)
 """
 
-from typing import Any, Literal
+import os
+from typing import Literal, cast
 
 import numpy as np
 import numpy.typing as npt
 
-from hp_dfr.models.base import BaseModel
-from hp_dfr.problems.poisson_1d import Poisson1D
+from hp_dfr.models.base import BaseModel, Problem
+from hp_dfr.utils import console
+
+ArrayF = npt.NDArray[np.floating]
+
+# Optional deep-learning backends, imported lazily (guarded) since only one is
+# needed at a time and each is heavy.
+os.environ.setdefault("KERAS_BACKEND", "tensorflow")
+try:
+    import keras
+    import tensorflow as tf
+except ImportError:  # backend not installed
+    keras = None
+    tf = None
+
+try:
+    import jax
+    import jax.numpy as jnp
+    import optax
+    from jax import grad, jit, random, vmap
+except ImportError:  # backend not installed
+    jax = None
+    jnp = None
+    optax = None
+    grad = jit = random = vmap = None
+
+try:
+    import torch
+    from torch import nn
+except ImportError:  # backend not installed
+    torch = None
+    nn = None
 
 
 class PINNsModel(BaseModel):
@@ -122,7 +129,7 @@ class PINNsModel(BaseModel):
         self.n_collocation = n_collocation
         self.bc_weight = bc_weight
         self.backend = backend
-        self._backend_module: Any = None
+        self._backend_module: object | None = None
 
     def build(self, input_dim: int = 1, output_dim: int = 1) -> None:
         """Build the neural network architecture.
@@ -165,10 +172,8 @@ class PINNsModel(BaseModel):
         output_dim : int
             Output dimension.
         """
-        import os
-
-        os.environ["KERAS_BACKEND"] = "tensorflow"
-        import keras
+        if keras is None:
+            raise RuntimeError("TensorFlow backend requires tensorflow and keras.")
 
         keras.utils.set_random_seed(self.seed)
         keras.backend.set_floatx(self.dtype)
@@ -201,9 +206,8 @@ class PINNsModel(BaseModel):
         output_dim : int
             Output dimension.
         """
-        import jax
-        import jax.numpy as jnp
-        from jax import random
+        if jax is None:
+            raise RuntimeError("JAX backend requires jax and optax.")
 
         jax.config.update("jax_enable_x64", self.dtype == "float64")
 
@@ -217,7 +221,7 @@ class PINNsModel(BaseModel):
             b = jnp.zeros(n)
             params.append({"w": w, "b": b})
 
-        self._model = params  # type: ignore
+        self._model = params
         self._backend_module = jax
 
     def _build_pytorch(self, input_dim: int, output_dim: int) -> None:
@@ -233,12 +237,12 @@ class PINNsModel(BaseModel):
         output_dim : int
             Output dimension.
         """
-        import torch
-        from torch import nn
+        if torch is None:
+            raise RuntimeError("PyTorch backend requires torch.")
 
         torch.manual_seed(self.seed)
 
-        layers: list[Any] = []
+        layers: list = []
         prev_dim = input_dim
 
         for neurons in self.hidden_layers:
@@ -251,15 +255,16 @@ class PINNsModel(BaseModel):
 
         layers.append(nn.Linear(prev_dim, output_dim))
 
-        self._model = nn.Sequential(*layers)  # type: ignore
+        model = nn.Sequential(*layers)
         if self.dtype == "float64":
-            self._model = self._model.double()  # type: ignore[attr-defined]
+            model = model.double()
+        self._model = model
 
         self._backend_module = torch
 
     def fit(
         self,
-        problem: Poisson1D[Any],
+        problem: Problem,
         epochs: int = 1000,
         learning_rate: float = 1e-3,
         verbose: bool = True,
@@ -271,7 +276,7 @@ class PINNsModel(BaseModel):
 
         Parameters
         ----------
-        problem : Poisson1D[Any]
+        problem : Problem
             Problem instance defining the PDE (domain, forcing function, BCs).
         epochs : int, optional
             Number of training iterations, by default 1000.
@@ -302,7 +307,7 @@ class PINNsModel(BaseModel):
 
         raise ValueError(f"Unknown backend: {self.backend}")
 
-    def _fit_tensorflow(self, problem: Poisson1D[Any], epochs: int, learning_rate: float, verbose: bool) -> dict[str, list[float]]:
+    def _fit_tensorflow(self, problem: Problem, epochs: int, learning_rate: float, verbose: bool) -> dict[str, list[float]]:
         """Train using TensorFlow.
 
         Uses tf.GradientTape for automatic differentiation to compute second
@@ -311,7 +316,7 @@ class PINNsModel(BaseModel):
 
         Parameters
         ----------
-        problem : Poisson1D[Any]
+        problem : Problem
             Problem instance.
         epochs : int
             Number of training epochs.
@@ -325,14 +330,16 @@ class PINNsModel(BaseModel):
         dict[str, list[float]]
             Training history.
         """
-        import tensorflow as tf
-        import keras
+        if keras is None:
+            raise RuntimeError("TensorFlow backend requires tensorflow and keras.")
+        assert self._model is not None
+        model = cast("keras.Model", self._model)
 
         optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
         domain = problem.domain
 
         @tf.function
-        def train_step() -> Any:
+        def train_step() -> tf.Tensor:
             # Random collocation points
             x = tf.random.uniform(
                 [self.n_collocation, 1],
@@ -346,7 +353,7 @@ class PINNsModel(BaseModel):
                     t1.watch(x)
                     with tf.GradientTape() as t2:
                         t2.watch(x)
-                        u = self._model(x, training=True)
+                        u = model(x, training=True)
                     du_dx = t2.gradient(u, x)
                 d2u_dx2 = t1.gradient(du_dx, x)
 
@@ -357,13 +364,13 @@ class PINNsModel(BaseModel):
 
                 # Boundary conditions
                 x_bc = tf.constant([[domain[0]], [domain[1]]], dtype=self.dtype)
-                u_bc = self._model(x_bc, training=True)
+                u_bc = model(x_bc, training=True)
                 bc_loss = tf.reduce_mean(u_bc**2)
 
                 loss = pde_loss + self.bc_weight * bc_loss
 
-            gradients = tape.gradient(loss, self._model.trainable_variables)
-            optimizer.apply_gradients(zip(gradients, self._model.trainable_variables))
+            gradients = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
             return loss
 
         self._history = {"loss": []}
@@ -373,11 +380,11 @@ class PINNsModel(BaseModel):
             self._history["loss"].append(float(loss))
 
             if verbose and (epoch + 1) % 100 == 0:
-                print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
+                console.print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}", markup=False)
 
         return self._history
 
-    def _fit_jax(self, problem: Poisson1D[Any], epochs: int, learning_rate: float, verbose: bool) -> dict[str, list[float]]:
+    def _fit_jax(self, problem: Problem, epochs: int, learning_rate: float, verbose: bool) -> dict[str, list[float]]:
         """Train using JAX.
 
         Uses JAX's functional autodiff (grad) with vmap for vectorization.
@@ -386,7 +393,7 @@ class PINNsModel(BaseModel):
 
         Parameters
         ----------
-        problem : Poisson1D[Any]
+        problem : Problem
             Problem instance.
         epochs : int
             Number of training epochs.
@@ -400,27 +407,25 @@ class PINNsModel(BaseModel):
         dict[str, list[float]]
             Training history.
         """
-        import jax
-        import jax.numpy as jnp
-        from jax import grad, jit, random, vmap
-        import optax
+        if jax is None:
+            raise RuntimeError("JAX backend requires jax and optax.")
 
         params = self._model
         optimizer = optax.adam(learning_rate)
         opt_state = optimizer.init(params)
         domain = problem.domain
 
-        def forward(params: Any, x: Any) -> Any:
+        def forward(params: list, x: "jax.Array") -> "jax.Array":
             for layer in params[:-1]:
                 x = jnp.tanh(x @ layer["w"] + layer["b"])
             return x @ params[-1]["w"] + params[-1]["b"]
 
-        def loss_fn(params: Any, key: Any) -> Any:
+        def loss_fn(params: list, key: "jax.Array") -> "jax.Array":
             # Random collocation points
             x = random.uniform(key, (self.n_collocation, 1), minval=domain[0], maxval=domain[1])
 
             # Compute second derivative using vmap
-            def u_scalar(xi: Any) -> Any:
+            def u_scalar(xi: "jax.Array") -> "jax.Array":
                 return forward(params, xi.reshape(1, -1))[0, 0]
 
             # du_dx = vmap(grad(u_scalar))
@@ -437,7 +442,7 @@ class PINNsModel(BaseModel):
             return pde_loss + self.bc_weight * bc_loss
 
         @jit
-        def train_step(params: Any, opt_state: Any, key: Any) -> tuple[Any, Any, Any]:
+        def train_step(params: list, opt_state: "optax.OptState", key: "jax.Array") -> tuple:
             loss, grads = jax.value_and_grad(loss_fn)(params, key)
             updates, opt_state = optimizer.update(grads, opt_state, params)
             params = optax.apply_updates(params, updates)
@@ -452,12 +457,12 @@ class PINNsModel(BaseModel):
             self._history["loss"].append(float(loss))
 
             if verbose and (epoch + 1) % 100 == 0:
-                print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
+                console.print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}", markup=False)
 
         self._model = params
         return self._history
 
-    def _fit_pytorch(self, problem: Poisson1D[Any], epochs: int, learning_rate: float, verbose: bool) -> dict[str, list[float]]:
+    def _fit_pytorch(self, problem: Problem, epochs: int, learning_rate: float, verbose: bool) -> dict[str, list[float]]:
         """Train using PyTorch.
 
         Uses torch.autograd.grad for computing second derivatives with
@@ -466,7 +471,7 @@ class PINNsModel(BaseModel):
 
         Parameters
         ----------
-        problem : Poisson1D[Any]
+        problem : Problem
             Problem instance.
         epochs : int
             Number of training epochs.
@@ -480,9 +485,12 @@ class PINNsModel(BaseModel):
         dict[str, list[float]]
             Training history.
         """
-        import torch
+        if torch is None:
+            raise RuntimeError("PyTorch backend requires torch.")
+        assert self._model is not None
+        model = cast("torch.nn.Module", self._model)
 
-        optimizer = torch.optim.Adam(self._model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         domain = problem.domain
         dtype = torch.float64 if self.dtype == "float64" else torch.float32
 
@@ -495,7 +503,7 @@ class PINNsModel(BaseModel):
             x = torch.rand(self.n_collocation, 1, dtype=dtype, requires_grad=True)
             x = x * (domain[1] - domain[0]) + domain[0]
 
-            u = self._model(x)
+            u = model(x)
 
             # Compute second derivative
             du_dx = torch.autograd.grad(u, x, grad_outputs=torch.ones_like(u), create_graph=True)[0]
@@ -509,7 +517,7 @@ class PINNsModel(BaseModel):
 
             # Boundary conditions
             x_bc = torch.tensor([[domain[0]], [domain[1]]], dtype=dtype)
-            u_bc = self._model(x_bc)
+            u_bc = model(x_bc)
             bc_loss = torch.mean(u_bc**2)
 
             loss = pde_loss + self.bc_weight * bc_loss
@@ -519,7 +527,7 @@ class PINNsModel(BaseModel):
             self._history["loss"].append(float(loss))
 
             if verbose and (epoch + 1) % 100 == 0:
-                print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
+                console.print(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}", markup=False)
 
         return self._history
 
@@ -545,24 +553,23 @@ class PINNsModel(BaseModel):
             x = x.reshape(-1, 1)
 
         if self.backend == "tensorflow":
-            return self._model(x, training=False).numpy().flatten()
+            model = cast("keras.Model", self._model)
+            return cast(np.ndarray, model(x, training=False).numpy().flatten())
 
         if self.backend == "jax":
-            import jax.numpy as jnp
 
-            def forward(params: Any, x: Any) -> Any:
+            def forward(params: list, x: "jax.Array") -> "jax.Array":
                 for layer in params[:-1]:
                     x = jnp.tanh(x @ layer["w"] + layer["b"])
                 return x @ params[-1]["w"] + params[-1]["b"]
 
-            return np.array(forward(self._model, x)).flatten()
+            return cast(np.ndarray, np.array(forward(cast(list, self._model), x)).flatten())
 
         if self.backend == "pytorch":
-            import torch
-
+            model = cast("torch.nn.Module", self._model)
             dtype = torch.float64 if self.dtype == "float64" else torch.float32
             x_tensor = torch.tensor(x, dtype=dtype)
             with torch.no_grad():
-                return self._model(x_tensor).numpy().flatten()
+                return cast(np.ndarray, model(x_tensor).numpy().flatten())
 
         raise ValueError(f"Unknown backend: {self.backend}")

@@ -13,13 +13,12 @@ import pytest
 from numpy.testing import assert_allclose
 
 from hp_dfr.models.goal_oriented_dfr import (
-    QuantityOfInterest,
-    PointEvaluationQoI,
     AverageValueQoI,
     BoundaryFluxQoI,
     GoalOrientedDFRModel,
+    PointEvaluationQoI,
+    QuantityOfInterest,
 )
-
 
 # =============================================================================
 # PointEvaluationQoI Tests
@@ -69,11 +68,13 @@ class TestPointEvaluationQoI:
         qoi = PointEvaluationQoI(point=point, sigma=0.01)
 
         # Evaluate at the point and nearby
-        x = np.array([
-            [0.5, 0.5],    # At point
-            [0.6, 0.5],    # Nearby
-            [0.9, 0.9],    # Far away
-        ])
+        x = np.array(
+            [
+                [0.5, 0.5],  # At point
+                [0.6, 0.5],  # Nearby
+                [0.9, 0.9],  # Far away
+            ]
+        )
 
         rhs = qoi.adjoint_rhs(x)
 
@@ -156,11 +157,13 @@ class TestAverageValueQoI:
         """Test adjoint RHS for full domain is constant."""
         qoi = AverageValueQoI()
 
-        x = np.array([
-            [0.1, 0.2],
-            [0.5, 0.5],
-            [0.9, 0.8],
-        ])
+        x = np.array(
+            [
+                [0.1, 0.2],
+                [0.5, 0.5],
+                [0.9, 0.8],
+            ]
+        )
 
         rhs = qoi.adjoint_rhs(x)
         # All ones for full domain
@@ -171,14 +174,16 @@ class TestAverageValueQoI:
         subdomain = ((0.5, 1.0), (0.0, 1.0))
         qoi = AverageValueQoI(subdomain=subdomain)
 
-        x = np.array([
-            [0.25, 0.5],  # Outside
-            [0.75, 0.5],  # Inside
-        ])
+        x = np.array(
+            [
+                [0.25, 0.5],  # Outside
+                [0.75, 0.5],  # Inside
+            ]
+        )
 
         rhs = qoi.adjoint_rhs(x)
         assert rhs[0] == 0.0  # Outside
-        assert rhs[1] > 0.0   # Inside
+        assert rhs[1] > 0.0  # Inside
 
 
 # =============================================================================
@@ -245,7 +250,7 @@ class TestGoalOrientedDFRModel:
         model = GoalOrientedDFRModel()
 
         assert model.dim == 2
-        assert model.hidden_layers == [20, 20, 20]
+        assert model.hidden_layers == (20, 20, 20)
         assert model.qoi is None
         assert model.adjoint_weight == 1.0
         assert model.primal_weight == 0.1
@@ -264,8 +269,7 @@ class TestGoalOrientedDFRModel:
             hidden_layers=[32, 32],
             activation="relu",
             n_quadrature=16,
-            max_level=8,
-            use_sparse=False,
+            n_modes=8,
             adjoint_weight=2.0,
             primal_weight=0.5,
         )
@@ -274,8 +278,7 @@ class TestGoalOrientedDFRModel:
         assert model.hidden_layers == [32, 32]
         assert model.activation == "relu"
         assert model.n_quadrature == 16
-        assert model.max_level == 8
-        assert model.use_sparse is False
+        assert model.n_modes == 8
         assert model.adjoint_weight == 2.0
         assert model.primal_weight == 0.5
 

@@ -20,17 +20,11 @@ References:
 
 from __future__ import annotations
 
-from typing import Callable, Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union, cast
+
 import numpy as np
 from numpy.typing import NDArray
 from scipy import fft as scipy_fft
-
-from hp_dfr.fourier.sparse_indices import (
-    HyperbolicCrossIndexSet,
-    full_tensor_indices,
-    hyperbolic_cross_indices,
-)
-
 
 # =============================================================================
 # 1D Transforms
@@ -79,7 +73,7 @@ def dst_1d(
     coeffs = scipy_fft.dst(f, type=1, norm=None)[:n_modes]
 
     # Scale to orthonormal coefficients
-    return norm * dx * coeffs / 2
+    return cast(NDArray[np.floating], norm * dx * coeffs / 2)
 
 
 def dct_1d(
@@ -113,7 +107,7 @@ def dct_1d(
 
     # Scale to orthonormal coefficients
     # DCT-I has different normalization at endpoints
-    return norm * dx * coeffs / 2
+    return cast(NDArray[np.floating], norm * dx * coeffs / 2)
 
 
 def dst_matrix_1d(
@@ -150,7 +144,7 @@ def dst_matrix_1d(
     basis = norm * np.sin(np.outer(k, (x_mid - a) * np.pi / L))
 
     # Include quadrature weight
-    return basis * dx
+    return cast(NDArray[np.floating], basis * dx)
 
 
 def dct_derivative_matrix_1d(
@@ -195,7 +189,7 @@ def dct_derivative_matrix_1d(
     for i, ki in enumerate(k):
         basis_deriv[i, :] = norm * (ki * np.pi / L) * np.cos(ki * np.pi * (x_mid - a) / L)
 
-    return basis_deriv * dx
+    return cast(NDArray[np.floating], basis_deriv * dx)
 
 
 # =============================================================================
@@ -233,7 +227,7 @@ def dst_nd_full(
     if isinstance(n_modes, int):
         n_modes = tuple([n_modes] * dim)
 
-    result = f.copy()
+    result: NDArray[np.floating] = f.copy()
 
     for axis in range(dim):
         a, b = domain[axis]
@@ -245,10 +239,8 @@ def dst_nd_full(
         # Apply DST along this axis
         result = scipy_fft.dst(result, type=1, axis=axis, norm=None)
 
-        # Truncate to n_modes
-        slices = [slice(None)] * dim
-        slices[axis] = slice(0, n_modes[axis])
-        result = result[tuple(slices)]
+        # Truncate to n_modes along this axis
+        result = cast(NDArray[np.floating], np.take(result, range(n_modes[axis]), axis=axis))
 
         # Normalize
         result = result * (norm * dx / 2)
@@ -256,150 +248,42 @@ def dst_nd_full(
     return result
 
 
-# =============================================================================
-# Sparse Transforms (Hyperbolic Cross)
-# =============================================================================
-
-
-def dst_nd_sparse(
-    f: NDArray[np.floating],
-    domain: Tuple[Tuple[float, float], ...],
-    index_set: HyperbolicCrossIndexSet,
-) -> NDArray[np.floating]:
-    """Compute n-dimensional DST at sparse index set only.
-
-    Instead of computing all O(N^d) coefficients, computes only
-    coefficients at indices in the hyperbolic cross.
-
-    Args:
-        f: Function values on tensor grid, shape (n1, ..., nd).
-        domain: Tuple of (a_i, b_i) for each dimension.
-        index_set: Hyperbolic cross index set.
-
-    Returns:
-        Sparse Fourier coefficients of shape (n_indices,).
-
-    Note:
-        For large problems, this is more efficient than computing
-        the full transform and extracting sparse indices.
-    """
-    dim = f.ndim
-    n_indices = len(index_set)
-
-    # For small problems, compute full transform and extract
-    # For large problems, would use hierarchical evaluation
-    if np.prod(f.shape) < 1e6:
-        return _dst_sparse_via_full(f, domain, index_set)
-    else:
-        return _dst_sparse_hierarchical(f, domain, index_set)
-
-
-def _dst_sparse_via_full(
-    f: NDArray[np.floating],
-    domain: Tuple[Tuple[float, float], ...],
-    index_set: HyperbolicCrossIndexSet,
-) -> NDArray[np.floating]:
-    """Compute sparse DST by extracting from full transform."""
-    dim = f.ndim
-
-    # Compute full transform
-    max_modes = tuple(int(np.max(index_set.indices[:, i])) for i in range(dim))
-    full_coeffs = dst_nd_full(f, domain, max_modes)
-
-    # Extract sparse indices (convert to 0-based)
-    sparse_coeffs = np.zeros(len(index_set))
-    for i, idx in enumerate(index_set.indices):
-        idx_0based = tuple(idx - 1)
-        sparse_coeffs[i] = full_coeffs[idx_0based]
-
-    return sparse_coeffs
-
-
-def _dst_sparse_hierarchical(
-    f: NDArray[np.floating],
-    domain: Tuple[Tuple[float, float], ...],
-    index_set: HyperbolicCrossIndexSet,
-) -> NDArray[np.floating]:
-    """Compute sparse DST using hierarchical evaluation.
-
-    For very large problems, this avoids computing all full coefficients
-    by using the tensor product structure more efficiently.
-    """
-    # For now, fall back to full computation
-    # TODO: Implement true hierarchical sparse evaluation
-    return _dst_sparse_via_full(f, domain, index_set)
-
-
-def dst_matrix_nd_sparse(
+def dst_matrix_nd_full(
     grid_shape: Tuple[int, ...],
     domain: Tuple[Tuple[float, float], ...],
-    index_set: HyperbolicCrossIndexSet,
+    n_modes: Union[int, Tuple[int, ...]],
 ) -> NDArray[np.floating]:
-    """Construct sparse DST matrix for direct multiplication.
+    """Construct full-tensor DST matrix for direct multiplication.
 
-    Creates matrix M such that: sparse_coeffs = M @ f.ravel()
+    Creates matrix M such that ``coeffs = M @ f.ravel()``, where ``f`` is the
+    function sampled on a tensor quadrature grid of shape ``grid_shape`` and
+    ``coeffs`` are the full tensor-product DST-I coefficients raveled in C order
+    over the multi-index (k_1, ..., k_d), matching the ordering of both
+    :func:`dst_nd_full` and :func:`h_minus_1_weights`.
 
-    This is useful when the same transform is applied many times
-    (e.g., during neural network training).
+    The matrix is the Kronecker product of the per-dimension 1D DST matrices,
+    which is exact because the sine basis is separable. This precomputed form is
+    useful when the same transform is applied many times (e.g., to the network
+    residual during training).
 
     Args:
         grid_shape: Shape of the function grid (n1, ..., nd).
         domain: Tuple of (a_i, b_i) for each dimension.
-        index_set: Hyperbolic cross index set.
+        n_modes: Number of modes per dimension (int for uniform, tuple for
+            varying).
 
     Returns:
-        Sparse DST matrix of shape (n_indices, prod(grid_shape)).
+        DST matrix of shape (prod(n_modes_per_dim), prod(grid_shape)).
     """
     dim = len(grid_shape)
-    n_grid = int(np.prod(grid_shape))
-    n_indices = len(index_set)
+    if isinstance(n_modes, int):
+        modes_per_dim: Tuple[int, ...] = (n_modes,) * dim
+    else:
+        modes_per_dim = n_modes
 
-    # Build 1D basis functions for each dimension
-    basis_1d = []
-    for d in range(dim):
-        a, b = domain[d]
-        L = b - a
-        n = grid_shape[d]
-
-        x = np.linspace(a, b, n + 1)
-        dx = x[1] - x[0]
-        x_mid = x[:-1] + dx / 2
-
-        norm = np.sqrt(2.0 / L)
-        max_k = int(np.max(index_set.indices[:, d]))
-
-        # basis_1d[d][k, x] = norm * sin(k*pi*(x-a)/L) * dx
-        k_vals = np.arange(1, max_k + 1)
-        basis = np.zeros((max_k, n))
-        for i, k in enumerate(k_vals):
-            basis[i, :] = norm * np.sin(k * np.pi * (x_mid - a) / L) * dx
-
-        basis_1d.append(basis)
-
-    # Build sparse matrix using tensor product of 1D bases
-    matrix = np.zeros((n_indices, n_grid))
-
-    for i, idx in enumerate(index_set.indices):
-        # Tensor product of 1D basis functions
-        row = np.ones(n_grid)
-        for d in range(dim):
-            k = idx[d] - 1  # 0-based index into basis
-            # Expand 1D basis to full grid using outer product structure
-            basis_d = basis_1d[d][k, :]
-
-            # Reshape for broadcasting
-            shape = [1] * dim
-            shape[d] = grid_shape[d]
-            basis_expanded = basis_d.reshape(shape)
-
-            # Tile to full grid
-            tile_shape = list(grid_shape)
-            tile_shape[d] = 1
-            basis_full = np.tile(basis_expanded, tile_shape).ravel()
-
-            row *= basis_full
-
-        matrix[i, :] = row
+    matrix = dst_matrix_1d(grid_shape[0], modes_per_dim[0], domain[0])
+    for d in range(1, dim):
+        matrix = np.kron(matrix, dst_matrix_1d(grid_shape[d], modes_per_dim[d], domain[d]))
 
     return matrix
 
@@ -432,17 +316,18 @@ def h_minus_1_weights(
     """
     if isinstance(n_modes, int):
         # 1D case
-        a, b = domain
+        a, b = cast(Tuple[float, float], domain)
         L = b - a
         k = np.arange(1, n_modes + 1)
-        return L / (np.pi * k)
+        return cast(NDArray[np.floating], L / (np.pi * k))
 
     # nD case
+    nd_domain = cast(Tuple[Tuple[float, float], ...], domain)
     dim = len(n_modes)
     weights_1d = []
 
     for d in range(dim):
-        a, b = domain[d]
+        a, b = nd_domain[d]
         L = b - a
         k = np.arange(1, n_modes[d] + 1)
         weights_1d.append(L / (np.pi * k))
@@ -452,33 +337,6 @@ def h_minus_1_weights(
     weights = np.ones(n_modes)
     for g in grids:
         weights *= g
-
-    return weights
-
-
-def h_minus_1_weights_sparse(
-    index_set: HyperbolicCrossIndexSet,
-    domain: Tuple[Tuple[float, float], ...],
-) -> NDArray[np.floating]:
-    """Compute H^{-1} norm weights for sparse index set.
-
-    Args:
-        index_set: Hyperbolic cross index set.
-        domain: Tuple of (a_i, b_i) for each dimension.
-
-    Returns:
-        Array of weights, shape (n_indices,).
-    """
-    dim = index_set.dim
-    n_indices = len(index_set)
-
-    weights = np.ones(n_indices)
-
-    for d in range(dim):
-        a, b = domain[d]
-        L = b - a
-        k_d = index_set.indices[:, d]
-        weights *= L / (np.pi * k_d)
 
     return weights
 
@@ -502,7 +360,7 @@ def compute_h_minus_1_norm(
     weights_flat = weights.ravel()
 
     norm_sq = np.sum((coeffs_flat * weights_flat) ** 2)
-    return np.sqrt(norm_sq)
+    return float(np.sqrt(norm_sq))
 
 
 # =============================================================================
@@ -530,24 +388,4 @@ def dfr_loss_1d(
     residual = residual_fn(x_quad)
     coeffs = dst_1d(residual, domain, n_modes)
     weights = h_minus_1_weights(n_modes, domain)
-    return float(np.sum((coeffs * weights) ** 2))
-
-
-def dfr_loss_nd_sparse(
-    residual_values: NDArray[np.floating],
-    domain: Tuple[Tuple[float, float], ...],
-    index_set: HyperbolicCrossIndexSet,
-) -> float:
-    """Compute n-dimensional DFR loss using sparse Fourier modes.
-
-    Args:
-        residual_values: Residual on tensor grid, shape (n1, ..., nd).
-        domain: Tuple of (a_i, b_i) for each dimension.
-        index_set: Hyperbolic cross index set.
-
-    Returns:
-        DFR loss value (H^{-1} norm squared).
-    """
-    coeffs = dst_nd_sparse(residual_values, domain, index_set)
-    weights = h_minus_1_weights_sparse(index_set, domain)
     return float(np.sum((coeffs * weights) ** 2))

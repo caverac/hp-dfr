@@ -1,0 +1,22 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.spl
+*.fdb_latexmk
+*.synctex.gz
+build.log
+
+# Compiled manuscript and figures synced from ../../assets (generated;
+# assets/ at the project root is the source of truth).
+*.pdf
+*.png
+
+# elsarticle artifacts
+*.spl
