@@ -93,12 +93,10 @@ present both cases, with the command that reproduces each figure.
 
 ## Scope
 
-The repository began with a broader plan combining three extensions of DFR (sparse
-Fourier modes, hp-adaptive domain decomposition, and goal-oriented error control).
-A review of the literature and the existing methods narrowed it to goal-oriented DFR,
-the most clearly distinct of the three. The
-[background and positioning page](/docs/preprint/literature-review) records that
-reasoning and places the work among related methods.
+This project focuses on goal-oriented error control for DFR. Two adjacent directions
+&mdash; sparse Fourier modes and hp-adaptive domain decomposition &mdash; are out of
+scope; the [background and positioning page](/docs/preprint/literature-review)
+explains why and places the work among related methods.
 
 ## Reading path
 

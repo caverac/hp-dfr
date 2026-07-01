@@ -47,7 +47,7 @@ equivalence. The QoI-weighted loss, plus a remainder built from the primal and
 adjoint residuals, bounds the error in the quantity of interest, and every term of
 the bound is computed during training. The remainder is a product of the two
 residuals; it is small when both networks are accurate, and its size governs when
-goal-orientation is useful. The precise statement is Theorem 4.4, on the
+goal-orientation is useful. The precise statement is Theorem 4.3, on the
 [Method and Results](/docs/preprint/phase3-goal-oriented#the-guarantee) page.
 
 ## What the experiments establish
@@ -71,11 +71,9 @@ Both cases, with the figures and the exact commands that reproduce them, are on 
 
 ## Scope
 
-The project originally proposed three combined extensions of DFR. A review (recorded
-in the session log `notebooks/notes/logs/20260629-idea-reframing.md`) narrowed it to
-goal-oriented DFR, for the reasons summarized on the
-[Background and Positioning](/docs/preprint/literature-review#how-this-project-is-scoped)
-page:
+This project targets goal-oriented error control for DFR. Two adjacent directions are
+out of scope, for reasons of novelty and existing coverage (see
+[Background and Positioning](/docs/preprint/literature-review#how-this-project-is-scoped)):
 
 - **Sparse Fourier modes.** The original DFR authors list better basis choices as
   future work; the hoped-for complexity savings rely on regularity a neural-network
@@ -86,7 +84,7 @@ page:
   DFR losses, Dorfler marking, refinement, with equivalence theory), leaving a
   narrow remaining gap.
 - **Goal-oriented DFR.** Pairing the dual-weighted residual specifically with the
-  DFR $H^{-1}$ loss is the least explored of the three, and is the focus here.
+  DFR $H^{-1}$ loss is the least explored of these directions, and is the focus here.
 
 ## Status
 
@@ -95,7 +93,7 @@ page:
 | Goal-oriented model + QoI classes | Implemented (`models/goal_oriented_dfr.py`), unit-tested         |
 | Dense DFR Fourier machinery       | Implemented and tested (`fourier/transforms.py`)                 |
 | 1D and 2D Poisson problems        | Implemented (`problems/poisson_1d.py`, `problems/poisson_2d.py`) |
-| QoI-error-control theorem         | Proved (Proposition 4.3 + Theorem 4.4 in the manuscript)         |
+| QoI-error-control theorem         | Proved (Proposition 4.2 + Theorem 4.3 in the manuscript)         |
 | 1D experiment (control)           | Done &mdash; figure `dfr-saturation-1d`                          |
 | 2D experiment (advantage)         | Done &mdash; figure `dfr-vs-go-2d`                               |
 

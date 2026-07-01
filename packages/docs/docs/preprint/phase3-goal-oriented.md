@@ -79,7 +79,7 @@ equivalence, under the standard well-posedness hypotheses (the
 Banach&ndash;Necas&ndash;Babuska conditions: a boundedness constant $M$ and an
 inf&ndash;sup constant $\gamma$).
 
-**Exact error representation (Proposition 4.3).** For any primal $u_h$ and adjoint
+**Exact error representation (Proposition 4.2).** For any primal $u_h$ and adjoint
 $z_h$,
 
 $$
@@ -90,7 +90,7 @@ $$
 The first term is the goal-oriented loss; the second involves the unknown exact
 adjoint and is bounded next.
 
-**QoI error control (Theorem 4.4).**
+**QoI error control (Theorem 4.3).**
 
 $$
 \bigl| J(u) - J(u_h) \bigr|
@@ -133,7 +133,7 @@ Reproduce with:
 ```bash
 # 1. Generate the sweep data (requires a PyTorch backend; a few minutes).
 #    On Intel macOS, install the backend once: uv pip install 'torch>=2.0.0,<2.2.0'
-KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_1d_data.py
+uv run hp-dfr data 1d
 
 # 2. Build the figure from the saved data (fast).
 uv run hp-dfr figures
@@ -164,7 +164,7 @@ Reproduce with:
 
 ```bash
 # 1. Generate the 2D sweep data (requires a PyTorch backend; ~15 minutes).
-KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_2d_data.py
+uv run hp-dfr data 2d
 
 # 2. Build the figure from the saved data (fast).
 uv run hp-dfr figures
@@ -191,7 +191,7 @@ DFR happens to resolve the bump particularly well.
 
 ### Why the two regimes differ
 
-The contrast follows from the second-order remainder in Theorem 4.4. When plain DFR
+The contrast follows from the second-order remainder in Theorem 4.3. When plain DFR
 already drives the primal residual to its floor (1D), the remainder is negligible and
 there is no error to reallocate; the extra adjoint network only complicates the
 optimization. When the primal residual cannot be made uniformly small at feasible
@@ -218,7 +218,7 @@ A command-line run:
 
 ```bash
 # Goal-oriented DFR on the 1D sharp problem, point QoI at the 65% location.
-KERAS_BACKEND=torch uv run hp-dfr research run \
+uv run hp-dfr research run \
   --problem arctan --backend pytorch \
   --qoi point --qoi-location 0.65 \
   --hidden-layers "16,16" --n-modes 60 --epochs 2000
