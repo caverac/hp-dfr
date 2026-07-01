@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/caverac/hp-dfr/compare/v1.0.0...v1.0.1) (2026-07-01)
+
+### Bug Fixes
+
+- **experiments:** data is generated via cli ([87deb93](https://github.com/caverac/hp-dfr/commit/87deb938205fdce94d34988054e0a76ad2f9be2a))
+
 # 1.0.0 (2026-07-01)
 
 ### Bug Fixes

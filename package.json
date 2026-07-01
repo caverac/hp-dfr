@@ -1,6 +1,6 @@
 {
   "name": "hp-dfr",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Goal-Oriented Deep Fourier Residual methods for solving PDEs with neural networks",
   "workspaces": [
