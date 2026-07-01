@@ -31,7 +31,7 @@ equivalence: under the standard well-posedness (Banach-Necas-Babuska) hypotheses
 inf-sup constant $\gamma$,
 
 $$
-\bigl| J(u) - J(u_h) \bigr| \;\le\; \mathcal{L}_{\mathrm{QoI}}(u_h, z_h) \;+\; \frac{1}{\gamma}\, \lVert R(u_h) \rVert_{V^*}\, \lVert R^*(z_h) \rVert_{U^*},
+\bigl| J(u) - J(u_h) \bigr| \;\le\; \mathcal{L}_{\mathrm{QoI}}(u_h, z_h) \;+\; \frac{1}{\gamma}\, \lVert R(u_h) \rVert_{V^\ast}\, \lVert R^\ast(z_h) \rVert_{U^\ast},
 $$
 
 and every term on the right is computed during training.
