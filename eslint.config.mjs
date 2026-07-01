@@ -13,7 +13,6 @@ export default [
       "**/node_modules/**",
       "**/build/**",
       "**/dist/**",
-      "**/cdk.out/**",
       "**/.docusaurus/**",
       "**/coverage/**",
     ],
@@ -43,6 +42,9 @@ export default [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      // TypeScript's own checker handles undefined symbols; the core no-undef
+      // rule false-flags type-level globals such as JSX in .tsx files.
+      "no-undef": "off",
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },

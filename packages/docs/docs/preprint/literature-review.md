@@ -12,6 +12,7 @@ estimation. It also records how the project's scope was chosen.
 ## Overview
 
 Three lines of work are relevant:
+
 1. **Deep Fourier Residual (DFR) methods** - variational PINNs with an $H^{-1}$ dual-norm loss
 2. **Adaptive and hp-refinement** - domain decomposition with local networks
 3. **Goal-oriented error estimation** - dual-weighted residual methods
@@ -63,11 +64,13 @@ The foundational work by Taylor, Pardo, and Muga establishes the Deep Fourier Re
 **Key Contribution**: Uses Discrete Sine/Cosine Transform to compute the $H^{-1}$ dual norm of the PDE residual, providing an error-equivalent loss function.
 
 **Advantages**:
+
 - Loss function is equivalent to energy norm error for well-posed problems
 - Works for solutions lacking $H^2$ regularity where PINNs fail
 - Theoretically grounded error-loss relationship
 
 **Limitations**:
+
 - Restricted to rectangular/cuboid domains
 - Curse of dimensionality: requires $O(N^d)$ Fourier modes
 - Uniform refinement everywhere
@@ -79,11 +82,13 @@ The foundational work by Taylor, Pardo, and Muga establishes the Deep Fourier Re
 Taylor et al. extended DFR to handle more general domains through overlapping domain decomposition.
 
 **Key Contributions**:
+
 - Extends DFR to polygonal domains (not just rectangles)
 - Introduces Dofler marking algorithm for adaptive test space refinement
 - Maintains error-loss equivalence under reasonable assumptions
 
 **Methodology**:
+
 - Decomposes domain into overlapping rectangles
 - Computes local DFR losses on each subdomain
 - Uses residual-based indicators for adaptive refinement
@@ -111,6 +116,7 @@ Extension of DFR to electromagnetic problems with $H(\text{curl})$ test function
 Kharazmi et al. introduced hp-Variational Physics-Informed Neural Networks, combining domain decomposition with variational formulations.
 
 **Key Features**:
+
 - Domain decomposition (h-refinement) with dynamic mesh resolution
 - Integration-by-parts reduces order of differential operators
 - Works efficiently with rough solutions (singularities, steep gradients)
@@ -127,6 +133,7 @@ A novel approach where subdomains dynamically adapt during training.
 **Key Innovation**: Unlike static domain decomposition, AB-PINNs modify decomposition on-the-fly throughout training by introducing new subdomains in regions of high residual loss.
 
 **Advantages**:
+
 - Inspired by classical adaptive mesh refinement
 - Different subdomains can specialize for different solution scales
 - Helps prevent convergence to undesirable local minima
@@ -148,10 +155,10 @@ Addresses high-order problems with discontinuities through adversarial and self-
 
 Several recent methods address adaptive collocation point distribution:
 
-| Method | Approach | Reference |
-|--------|----------|-----------|
-| **RAR** | Residual-based Adaptive Refinement | Wu et al. |
-| **RAD** | Residual-based Adaptive Distribution | Wu et al. |
+| Method  | Approach                                             | Reference          |
+| ------- | ---------------------------------------------------- | ------------------ |
+| **RAR** | Residual-based Adaptive Refinement                   | Wu et al.          |
+| **RAD** | Residual-based Adaptive Distribution                 | Wu et al.          |
 | **AAS** | Adversarial Adaptive Sampling with optimal transport | Tang et al. (2024) |
 
 **RAR/RAD** generate additional points in high-residual regions or adjust distributions based on loss function approximation.
@@ -177,12 +184,14 @@ where $z$ is the adjoint solution and $R$ is the residual.
 Chakraborty, Wick, Zhuang, and Rabczuk explored using neural networks to compute adjoints for goal-oriented error estimation.
 
 **Key Findings**:
+
 - Neural networks can approximate adjoint solutions with 2-3 hidden layers
 - NN-computed adjoints yield excellent approximations for DWR error estimates
 - May serve as alternative to FEM adjoints when degrees of freedom are high
 - Superior approximation of QoI even with relatively less training data
 
 **Methodology**:
+
 - Solve both primal and adjoint problems with neural networks
 - Use error localization for multiple goal functionals
 - Handles nonlinear PDEs and nonlinear goal functionals
@@ -196,6 +205,7 @@ Chakraborty, Wick, Zhuang, and Rabczuk explored using neural networks to compute
 Explicit work on using feedforward NNs to compute adjoints within traditional FEM frameworks.
 
 **Approach**:
+
 1. Solve adjoint PDE with neural networks (strong formulation)
 2. Project NN solution into FEM space
 3. Use projected adjoint for DWR error estimation
@@ -225,6 +235,7 @@ Rigorous a posteriori error bounds for PINNs that can be computed without knowin
 **Applications**: Transport equation, heat equation, Navier-Stokes, Klein-Gordon equation.
 
 **Sources**:
+
 - [Certified machine learning: A posteriori error estimation for physics-informed neural networks](https://arxiv.org/abs/2203.17055) (arXiv:2203.17055)
 - [Rigorous a Posteriori Error Bounds for PDE-Defined PINNs](https://ieeexplore.ieee.org/document/10337737/) (IEEE, 2024)
 
@@ -257,6 +268,7 @@ A priori and a posteriori error estimates for PINNs solving linear PDEs.
 **Key Innovation**: Decomposes gradient into dimensional pieces, randomly sampling subsets per iteration.
 
 **Results**:
+
 - Solves HJB and Schrodinger equations in tens of thousands of dimensions on single GPU
 - 1,000 dimensions in < 1 hour
 - 100,000 dimensions in 12 hours
@@ -286,6 +298,7 @@ The foundational work on sparse grids provides the mathematical basis for sparse
 Comprehensive survey on transfer learning and meta-learning approaches to address PINN limitations.
 
 **Key Limitations Addressed**:
+
 - Convergence challenges in training
 - Need to re-optimize when PDE parameters change
 
@@ -301,24 +314,24 @@ SA-PINN: Local sensitivity analysis via loss function regularization.
 
 ### 6.3 Comprehensive Reviews
 
-| Review | Focus | Source |
-|--------|-------|--------|
-| Cuomo et al. (2022) | Scientific ML with PINNs | [Journal of Scientific Computing](https://link.springer.com/article/10.1007/s10915-022-01939-z) |
-| Liu et al. (2025) | PINNs for PDE problems | [Artificial Intelligence Review](https://link.springer.com/article/10.1007/s10462-025-11322-7) |
-| Mishra & Molinaro (2024) | Numerical analysis of PINNs | [Acta Numerica](https://www.cambridge.org/core/journals/acta-numerica/article/numerical-analysis-of-physicsinformed-neural-networks-and-related-models-in-physicsinformed-machine-learning/A059C6E13478F0F7C70EC7C976716F9F) |
-| ML + Domain Decomposition | Survey | [Computational Science and Engineering](https://link.springer.com/article/10.1007/s44207-024-00003-y) |
+| Review                    | Focus                       | Source                                                                                                                                                                                                                       |
+| ------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cuomo et al. (2022)       | Scientific ML with PINNs    | [Journal of Scientific Computing](https://link.springer.com/article/10.1007/s10915-022-01939-z)                                                                                                                              |
+| Liu et al. (2025)         | PINNs for PDE problems      | [Artificial Intelligence Review](https://link.springer.com/article/10.1007/s10462-025-11322-7)                                                                                                                               |
+| Mishra & Molinaro (2024)  | Numerical analysis of PINNs | [Acta Numerica](https://www.cambridge.org/core/journals/acta-numerica/article/numerical-analysis-of-physicsinformed-neural-networks-and-related-models-in-physicsinformed-machine-learning/A059C6E13478F0F7C70EC7C976716F9F) |
+| ML + Domain Decomposition | Survey                      | [Computational Science and Engineering](https://link.springer.com/article/10.1007/s44207-024-00003-y)                                                                                                                        |
 
 ---
 
 ## 7. Summary Table
 
-| Topic | Key Methods | Status | Relevance to hp-DFR |
-|-------|-------------|--------|---------------------|
-| **DFR Extensions** | Adaptive DFR, DFR-Maxwell | Active (2024) | Direct foundation |
-| **hp-Refinement** | hp-VPINNs, AB-PINNs | Active (2025) | Architecture design |
-| **Goal-Oriented** | DWR-DNN, E2N | Active (2025) | Error estimation |
-| **A Posteriori** | Certified ML | Active (2025) | Validation framework |
-| **High-Dimensional** | SDGD, Tensor NN | Active (2024) | Curse of dimensionality |
+| Topic                | Key Methods               | Status        | Relevance to hp-DFR     |
+| -------------------- | ------------------------- | ------------- | ----------------------- |
+| **DFR Extensions**   | Adaptive DFR, DFR-Maxwell | Active (2024) | Direct foundation       |
+| **hp-Refinement**    | hp-VPINNs, AB-PINNs       | Active (2025) | Architecture design     |
+| **Goal-Oriented**    | DWR-DNN, E2N              | Active (2025) | Error estimation        |
+| **A Posteriori**     | Certified ML              | Active (2025) | Validation framework    |
+| **High-Dimensional** | SDGD, Tensor NN           | Active (2024) | Curse of dimensionality |
 
 ---
 
@@ -346,6 +359,7 @@ functional $|\langle R(u), z \rangle|$ where the dual norm is computed a la DFR.
 This is the defensible novel core.
 
 ### Theory required
+
 - A goal-oriented analogue of DFR's error-loss equivalence: the QoI-weighted
   dual-norm loss controls $|J(u) - J(u_h)|$.
 

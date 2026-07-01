@@ -1,133 +1,128 @@
 # Goal-Oriented Deep Fourier Residual Methods
 
-This repository contains the implementation and experiments for extending the Deep Fourier Residual (DFR) method with **goal-oriented error control** for solving PDEs using neural networks.
+[![Documentation](https://img.shields.io/badge/docs-caverac.github.io%2Fhp--dfr-1f6feb)](https://caverac.github.io/hp-dfr/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 
-**Full documentation**: [https://caverac.github.io/hp-dfr](https://caverac.github.io/hp-dfr)
+**Full documentation and results: [caverac.github.io/hp-dfr](https://caverac.github.io/hp-dfr/)**
 
-## Table of Contents
+A neural-network solver for partial differential equations that targets a specific
+quantity of interest rather than the global error.
 
-- [Our Research](#our-research)
-  - [Key Idea](#key-idea)
-- [Background: The Deep Fourier Residual Method](#background-the-deep-fourier-residual-method)
-- [Repository Structure](#repository-structure)
-- [Quick Start](#quick-start)
-- [Packages](#packages)
-- [Contributing](#contributing)
-- [License](#license)
+The Deep Fourier Residual (DFR) method solves a PDE by minimizing the $H^{-1}$ dual
+norm of the weak residual -- a loss that is provably equivalent to the solution error.
+This project extends DFR with **goal-oriented error control**: when the object of
+interest is a single functional of the solution $J(u)$ -- a point value, a subdomain
+average, a boundary flux -- rather than the solution everywhere, the loss is weighted
+toward that functional using the dual-weighted residual (DWR) framework.
 
-## Our Research
+## The idea
 
-We extend the Deep Fourier Residual method with **goal-oriented error control**. Instead of minimizing the global H⁻¹ residual norm, we apply the dual-weighted residual (DWR) framework to the DFR loss: a primal network and an adjoint network are trained together, and the loss is the QoI-weighted residual functional `|<R(u), z>|`, evaluated with the same spectral machinery DFR uses for the H⁻¹ norm.
+A **primal** network $u_\theta$ approximates the solution and an **adjoint** network
+$z_\phi$ approximates the sensitivity of $J$ to the residual. The primal network
+minimizes the QoI-weighted residual
 
-### Key Idea
+$$
+\mathcal{L}_{\mathrm{QoI}}(u_\theta, z_\phi) = \bigl| \langle R(u_\theta),\, z_\phi \rangle \bigr|,
+$$
 
-The original DFR method establishes that the H⁻¹ dual-norm loss is equivalent to the H¹ error for well-posed problems. That controls the *global* error. For a quantity of interest (QoI) -- a point value, a subdomain average, a boundary flux -- this control is indirect. Goal-oriented DFR targets the QoI directly.
+while the adjoint network is trained on its own residual so that it approximates the
+true adjoint. The central result is a goal-oriented analogue of the DFR error-loss
+equivalence: under the standard well-posedness (Banach-Necas-Babuska) hypotheses, with
+inf-sup constant $\gamma$,
 
-- **Contribution**: pairing DWR with the DFR H⁻¹ dual-norm loss specifically (distinct from existing goal-oriented PINN/Deep Ritz work).
-- **Acceptance gate (theory)**: a goal-oriented analogue of the DFR error-loss equivalence, i.e., the QoI-weighted loss controls `|J(u) - J(u_h)|`.
+$$
+\bigl| J(u) - J(u_h) \bigr| \;\le\; \mathcal{L}_{\mathrm{QoI}}(u_h, z_h) \;+\; \frac{1}{\gamma}\, \lVert R(u_h) \rVert_{V^*}\, \lVert R^*(z_h) \rVert_{U^*},
+$$
 
-> The project was originally scoped around three combined extensions (sparse Fourier modes, hp-adaptive domain decomposition, goal-oriented DFR). A June 2026 viability review narrowed it to goal-oriented DFR alone; the rationale (prior art, technical soundness, venue requirements) is recorded in `notebooks/notes/logs/20260629-idea-reframing.md`.
+and every term on the right is computed during training.
 
-## Background: The Deep Fourier Residual Method
+## Main result
 
-This work builds upon the Deep Fourier Residual method introduced in:
+Goal-orientation helps exactly where the second-order structure of the bound predicts
+-- when the network is resolution-limited.
 
-> **A Deep Fourier Residual Method for solving PDEs using Neural Networks**
-> Jamie M. Taylor, David Pardo, Ignacio Muga
-> [arXiv:2210.14129](https://arxiv.org/abs/2210.14129) | [Published Version](https://www.sciencedirect.com/science/article/abs/pii/S0045782522008064)
+- **1D Poisson (control):** plain DFR already reaches its optimization floor
+  (error $\sim 10^{-5}$) at the smallest networks, so there is nothing to gain.
+- **2D Poisson, sharp feature:** a network of practical size cannot resolve the
+  solution everywhere, and goal-orientation reduces the point-QoI error by roughly
+  **three to five times** at matched degrees of freedom.
 
-The original DFR paper provides the theoretical foundation for using dual norm losses in physics-informed neural networks. Our work extends this framework with adaptive strategies to improve scalability and accuracy.
+The figures, numbers, and reproduction commands are in the
+[documentation](https://caverac.github.io/hp-dfr/docs/preprint/phase3-goal-oriented#results).
 
-### References
+> The project was originally scoped around three combined extensions (sparse Fourier
+> modes, hp-adaptive domain decomposition, and goal-oriented DFR). A June 2026 review
+> narrowed it to goal-oriented DFR alone; the rationale is recorded in
+> `notebooks/notes/logs/20260629-idea-reframing.md`.
 
-- **Reference Implementation**: [PINNS-and-DFR-examples](https://github.com/Mathmode/PINNS-and-DFR-examples) - Benchmarking platform by the MATHMODE group comparing PINNs and DFR implementations in TensorFlow, JAX, and PyTorch.
+## Quick start
 
-## Repository Structure
+**Prerequisites:** [uv](https://github.com/astral-sh/uv) (Python >= 3.11), and
+Node.js >= 22 with Yarn >= 4 for the documentation site.
 
-This monorepo contains four packages:
+```bash
+git clone https://github.com/caverac/hp-dfr.git
+cd hp-dfr
+
+# Python package (experiments). Install a backend extra; on Intel macOS use
+# `uv pip install 'torch>=2.0.0,<2.2.0'` instead of the pytorch extra.
+uv sync --extra pytorch
+
+# Run a goal-oriented experiment: 1D sharp problem, point QoI at the 65% location.
+uv run hp-dfr research run --problem arctan --qoi point --qoi-location 0.65
+
+# See all commands (pinns / dfr / research / figures / backends).
+uv run hp-dfr --help
+```
+
+Reproduce the paper figures (generate the sweep data, then render):
+
+```bash
+KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_1d_data.py
+KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_2d_data.py
+uv run hp-dfr figures
+```
+
+Run the documentation site locally:
+
+```bash
+yarn install
+yarn docs:dev      # http://localhost:3000
+```
+
+## Repository structure
 
 ```
 packages/
-├── preprint/       # Paper draft (LaTeX)
-├── experiments/    # Python code to reproduce results
-├── docs/           # Documentation site (Docusaurus)
-└── infra/          # AWS infrastructure (CDK TypeScript)
+  preprint/       # Manuscript (LaTeX, single-file ms.tex)
+  experiments/    # Python package: goal-oriented DFR + DFR/PINN baselines
+  docs/           # Documentation site (Docusaurus)
 ```
 
-## Quick Start
+## Development
 
-### Prerequisites
-
-- Node.js >= 22
-- Yarn >= 4
-- Python >= 3.10
-- AWS CLI (for infrastructure deployment)
-
-### Installation
+Quality gates run in CI and via [pre-commit](https://pre-commit.com):
 
 ```bash
-# Enable Corepack for Yarn 4
-corepack enable
-
-# Install dependencies
-yarn install
-
-# Run experiments (see packages/experiments/README.md)
-cd packages/experiments
-uv sync
-uv run hp-dfr --help
-uv run hp-dfr research run --problem sine --qoi point
-
-# Start documentation site
-yarn docs:dev
+uv run pre-commit install      # black, isort, flake8, pylint, pydocstyle, mypy, prettier, eslint
 ```
 
-### Upgrade Dependencies
+Commits follow [Conventional Commits](https://www.conventionalcommits.org); releases
+and the version bump are automated by semantic-release on merge to `main`.
 
-```bash
-uv lock --upgrade
-uv sync
-uv sync --extra pytorch
-```
+## Background
 
-and 
+This work builds on the Deep Fourier Residual method:
 
-```bash
-yarn up "*"
-```
+> **A Deep Fourier Residual Method for solving PDEs using Neural Networks.**
+> Jamie M. Taylor, David Pardo, Ignacio Muga.
+> _Computer Methods in Applied Mechanics and Engineering_ **405** (2023) 115850.
+> [arXiv:2210.14129](https://arxiv.org/abs/2210.14129) |
+> [publisher](https://doi.org/10.1016/j.cma.2022.115850)
 
-## Packages
-
-### Preprint (`packages/preprint`)
-
-LaTeX source for the research paper presenting our goal-oriented DFR method.
-
-### Experiments (`packages/experiments`)
-
-Python package implementing goal-oriented DFR with TensorFlow and PyTorch backends, plus DFR and PINN baselines for comparison.
-
-### Documentation (`packages/docs`)
-
-Interactive documentation explaining the theory behind the methods, with tutorials and API reference.
-
-```bash
-yarn docs:dev    # Start dev server
-yarn docs:build  # Build for production
-```
-
-### Infrastructure (`packages/infra`)
-
-AWS CDK infrastructure for running experiments at scale using ECS/Fargate.
-
-```bash
-yarn infra:synth   # Synthesize CloudFormation
-yarn infra:deploy  # Deploy to AWS
-```
-
-## Contributing
-
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Reference implementations by the MATHMODE group:
+[PINNS-and-DFR-examples](https://github.com/Mathmode/PINNS-and-DFR-examples).
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+Released under the MIT License.

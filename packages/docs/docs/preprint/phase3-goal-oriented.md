@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-sidebar_label: 'Method and Results'
+sidebar_label: "Method and Results"
 ---
 
 # Goal-Oriented DFR: Method and Results
@@ -105,7 +105,7 @@ quantities minimized during training: the goal-oriented loss, the primal DFR
 residual, and the adjoint DFR residual. The bound is therefore computable a
 posteriori, without the true solution.
 
-The remainder is a *product* of the primal and adjoint residuals. If both are trained
+The remainder is a _product_ of the primal and adjoint residuals. If both are trained
 to size $\delta$, the goal loss estimates the QoI error to $O(\delta^2)$. This
 second-order structure has a direct consequence for the experiments: when the primal
 residual is already at its floor, the remainder is negligible and goal-orientation
@@ -177,12 +177,12 @@ In this resolution-limited regime goal-orientation is the more accurate method a
 almost every size, improving the median QoI error by roughly three to five times and
 winning on ten of the twelve configurations:
 
-| Degrees of freedom | Plain DFR | Goal-oriented | Improvement |
-|---:|---:|---:|---:|
-| 105  | $2.4\times10^{-4}$ | $4.5\times10^{-5}$ | $5.3\times$ |
-| 337  | $1.6\times10^{-5}$ | $1.3\times10^{-5}$ | $1.2\times$ |
-| 697  | $7.9\times10^{-6}$ | $2.8\times10^{-6}$ | $2.8\times$ |
-| 1185 | $1.0\times10^{-5}$ | $3.2\times10^{-6}$ | $3.1\times$ |
+| Degrees of freedom |          Plain DFR |      Goal-oriented | Improvement |
+| -----------------: | -----------------: | -----------------: | ----------: |
+|                105 | $2.4\times10^{-4}$ | $4.5\times10^{-5}$ | $5.3\times$ |
+|                337 | $1.6\times10^{-5}$ | $1.3\times10^{-5}$ | $1.2\times$ |
+|                697 | $7.9\times10^{-6}$ | $2.8\times10^{-6}$ | $2.8\times$ |
+|               1185 | $1.0\times10^{-5}$ | $3.2\times10^{-6}$ | $3.1\times$ |
 
 The advantage is largest at the smallest network, where plain DFR is most starved of
 resolution, and persists at the larger sizes as the adjoint network becomes well

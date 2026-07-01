@@ -15,11 +15,12 @@ This guide covers how to set up the Goal-Oriented DFR environment.
 
 :::caution Platform Support
 Deep learning backends have limited platform support:
+
 - **Apple Silicon (M1/M2/M3)**: All backends supported
 - **Intel Mac (x86_64)**: Only PyTorch 2.1.x with Python 3.11
 - **Linux**: All backends supported
 - **Windows**: TensorFlow and PyTorch supported
-:::
+  :::
 
 ## Clone the Repository
 
@@ -77,10 +78,11 @@ uv pip install "torch>=2.0.0,<2.2.0"
 ```
 
 :::warning Intel Mac Limitations
+
 - **TensorFlow**: No longer supports Intel Macs (dropped in TF 2.16+)
 - **JAX**: No longer supports Intel Macs (dropped in JAX 0.4.20+)
 - **PyTorch**: Only versions 2.0.x-2.1.x support Intel Mac, and only with Python 3.11
-:::
+  :::
 
 ### Alternative: pip Installation
 
@@ -286,13 +288,13 @@ uv pip install jax jaxlib  # JAX
 
 ## Platform Compatibility Matrix
 
-| Platform | Python | TensorFlow | PyTorch | JAX |
-|----------|--------|------------|---------|-----|
-| Apple Silicon (M1/M2/M3) | 3.11-3.13 | Yes | Yes | Yes |
-| Intel Mac (x86_64) | 3.11 only | No | 2.0-2.1 only | No |
-| Linux x86_64 | 3.11-3.13 | Yes | Yes | Yes |
-| Linux ARM64 | 3.11-3.13 | Yes | Yes | Yes |
-| Windows x64 | 3.11-3.13 | Yes | Yes | No |
+| Platform                 | Python    | TensorFlow | PyTorch      | JAX |
+| ------------------------ | --------- | ---------- | ------------ | --- |
+| Apple Silicon (M1/M2/M3) | 3.11-3.13 | Yes        | Yes          | Yes |
+| Intel Mac (x86_64)       | 3.11 only | No         | 2.0-2.1 only | No  |
+| Linux x86_64             | 3.11-3.13 | Yes        | Yes          | Yes |
+| Linux ARM64              | 3.11-3.13 | Yes        | Yes          | Yes |
+| Windows x64              | 3.11-3.13 | Yes        | Yes          | No  |
 
 ## Next Steps
 

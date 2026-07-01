@@ -40,6 +40,7 @@ $$
 $$
 
 where:
+
 - $\{x_i\}_{i=1}^{N_r}$ are interior collocation points
 - $\{x_j\}_{j=1}^{N_b}$ are boundary points
 - $\lambda$ is a penalty parameter
@@ -137,6 +138,7 @@ def compute_derivatives(u: Tensor, x: Tensor) -> tuple[Tensor, Tensor]:
 
 :::caution
 While PINNs scales better than FEM in high dimensions, it still has limitations:
+
 - Weak loss-error correlation (L² loss ≠ error norm)
 - Requires H² regularity
 

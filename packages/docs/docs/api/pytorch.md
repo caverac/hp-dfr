@@ -23,10 +23,10 @@ backend = PyTorchBackend(
 
 ### Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `dtype` | `str` | `'float64'` | Floating point precision |
-| `device` | `str` | `'cpu'` | Device for computation |
+| Parameter | Type  | Default     | Description              |
+| --------- | ----- | ----------- | ------------------------ |
+| `dtype`   | `str` | `'float64'` | Floating point precision |
+| `device`  | `str` | `'cpu'`     | Device for computation   |
 
 ## Model Construction
 
