@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/caverac/hp-dfr/compare/v1.0.2...v1.0.3) (2026-07-01)
+
+### Bug Fixes
+
+- **preprint:** make figures width consistent ([e7a4001](https://github.com/caverac/hp-dfr/commit/e7a40015ee77b33e26ef03cbad891616519f139a))
+
 ## [1.0.2](https://github.com/caverac/hp-dfr/compare/v1.0.1...v1.0.2) (2026-07-01)
 
 ### Bug Fixes
