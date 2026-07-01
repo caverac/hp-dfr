@@ -8,13 +8,15 @@ This guide walks you through running your first PINNs and DFR experiments using 
 
 ## CLI Overview
 
-The `hp-dfr` CLI provides three main command groups:
+The `hp-dfr` CLI provides four command groups and two utility commands:
 
 ```bash
-hp-dfr pinns ...     # Physics-Informed Neural Networks (baseline)
-hp-dfr dfr ...       # Deep Fourier Residual method (reference paper)
-hp-dfr research ...  # Goal-Oriented DFR (this project)
-hp-dfr figures       # Build the preprint figures from saved data
+hp-dfr pinns --help     # Physics-Informed Neural Networks (baseline)
+hp-dfr dfr --help       # Deep Fourier Residual method (reference paper)
+hp-dfr research --help  # Goal-Oriented DFR (this project)
+hp-dfr data --help      # Generate the preprint sweep data
+hp-dfr figures          # Build the preprint figures from saved data
+hp-dfr backends         # List available deep-learning backends
 ```
 
 ## Running Your First Experiment
@@ -63,7 +65,7 @@ hp-dfr research run \
   --n-modes 60 \
   --epochs 2000
 
-# Subdomain-average QoI instead of a point value
+# Full-domain average QoI instead of a point value
 hp-dfr research run \
   --problem sine \
   --backend pytorch \
@@ -101,7 +103,7 @@ problem = poisson_1d.get_problem("sine")
 
 # Create the model
 model = PINNsModel(
-    hidden_layers=[64, 64, 64],
+    hidden_layers=(64, 64, 64),
     backend="pytorch",
     seed=1234,
 )
@@ -135,7 +137,7 @@ problem = poisson_1d.get_problem("sine")
 
 # Create the DFR model
 model = DFRModel(
-    hidden_layers=[10, 10, 10, 10],
+    hidden_layers=(10, 10, 10, 10),
     n_fourier_modes=10,
     backend="pytorch",
     seed=1234,
@@ -171,12 +173,12 @@ problem = poisson_1d.get_problem("sine")
 epochs = 1000
 
 # Train PINNs
-pinns = PINNsModel(hidden_layers=[64, 64, 64], backend="pytorch", seed=1234)
+pinns = PINNsModel(hidden_layers=(64, 64, 64), backend="pytorch", seed=1234)
 pinns.build()
 pinns_history = pinns.fit(problem, epochs=epochs, learning_rate=1e-3)
 
 # Train DFR
-dfr = DFRModel(hidden_layers=[10, 10, 10, 10], n_fourier_modes=10, backend="pytorch", seed=1234)
+dfr = DFRModel(hidden_layers=(10, 10, 10, 10), n_fourier_modes=10, backend="pytorch", seed=1234)
 dfr.build()
 dfr_history = dfr.fit(problem, epochs=epochs, learning_rate=1e-3)
 
@@ -207,13 +209,12 @@ plt.savefig("comparison.png")
 
 ## Reproducing Paper Results
 
-To reproduce results from the reference DFR paper:
+To reproduce results from the reference DFR paper, run the benchmark problems
+individually with the paper hyperparameters (create the output directory first,
+since `--output` does not create parent directories):
 
 ```bash
-# Reproduce all paper results
-hp-dfr dfr reproduce --output-dir results/dfr_paper
-
-# Or run specific problems
+mkdir -p results
 hp-dfr dfr run --problem sine --n-modes 10 --epochs 10000 --output results/sine.png
 hp-dfr dfr run --problem arctan --n-modes 20 --epochs 20000 --output results/arctan.png
 ```
@@ -225,8 +226,11 @@ data (slow; requires a PyTorch backend), then render the figures (fast).
 
 ```bash
 # Generate the 1D and 2D sweep data into the assets/ directory.
-KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_1d_data.py
-KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_2d_data.py
+uv run hp-dfr data all
+
+# Or generate a single sweep (defaults to the PyTorch backend):
+uv run hp-dfr data 1d
+uv run hp-dfr data 2d
 
 # Render the figures (assets/dfr-saturation-1d.* and assets/dfr-vs-go-2d.*).
 uv run hp-dfr figures
@@ -278,8 +282,8 @@ and their interpretation.
 | ---------------- | ------- | ------------------------------------------ |
 | `--qoi`          | point   | Quantity of interest: `point` or `average` |
 | `--qoi-location` | 0.5     | Point-QoI location, relative in `[0, 1]`   |
-| `--n-modes`      | 10      | Fourier modes per dimension                |
-| `--n-quadrature` | 100     | Quadrature points per dimension            |
+| `--n-modes`      | 20      | Fourier modes per dimension                |
+| `--n-quadrature` | 64      | Quadrature points per dimension            |
 
 ## Next Steps
 

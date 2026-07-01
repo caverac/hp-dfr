@@ -88,10 +88,9 @@ experiments/
 ## Reproducing Paper Results
 
 ```bash
-# Run all paper experiments
-hp-dfr dfr reproduce --output-dir results/
-
-# Or run individual experiments
+# Run the benchmark problems individually (create the output directory first,
+# since --output does not create parent directories).
+mkdir -p results
 hp-dfr dfr run --problem sine --epochs 1000 --output results/sine_dfr.png
 hp-dfr pinns run --problem sine --epochs 1000 --output results/sine_pinns.png
 ```
