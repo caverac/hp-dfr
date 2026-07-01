@@ -98,12 +98,12 @@ hp-dfr pinns run --problem sine --epochs 1000 --output results/sine_pinns.png
 
 ## Available Problems
 
-| Problem | Description | Regularity |
-|---------|-------------|------------|
-| `sine` | Smooth solution u(x) = sin(2x) | H² |
-| `arctan` | Large gradients | H² |
-| `discontinuous` | Discontinuous coefficients | H¹ |
-| `delta` | Point source | H¹ |
+| Problem         | Description                    | Regularity |
+| --------------- | ------------------------------ | ---------- |
+| `sine`          | Smooth solution u(x) = sin(2x) | H²         |
+| `arctan`        | Large gradients                | H²         |
+| `discontinuous` | Discontinuous coefficients     | H¹         |
+| `delta`         | Point source                   | H¹         |
 
 ## Development
 

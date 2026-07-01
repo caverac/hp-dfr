@@ -21,7 +21,7 @@ We extend the Deep Fourier Residual method with **goal-oriented error control**.
 
 ### Key Idea
 
-The original DFR method establishes that the H⁻¹ dual-norm loss is equivalent to the H¹ error for well-posed problems. That controls the *global* error. For a quantity of interest (QoI) -- a point value, a subdomain average, a boundary flux -- this control is indirect. Goal-oriented DFR targets the QoI directly.
+The original DFR method establishes that the H⁻¹ dual-norm loss is equivalent to the H¹ error for well-posed problems. That controls the _global_ error. For a quantity of interest (QoI) -- a point value, a subdomain average, a boundary flux -- this control is indirect. Goal-oriented DFR targets the QoI directly.
 
 - **Contribution**: pairing DWR with the DFR H⁻¹ dual-norm loss specifically (distinct from existing goal-oriented PINN/Deep Ritz work).
 - **Acceptance gate (theory)**: a goal-oriented analogue of the DFR error-loss equivalence, i.e., the QoI-weighted loss controls `|J(u) - J(u_h)|`.
@@ -50,8 +50,7 @@ This monorepo contains four packages:
 packages/
 ├── preprint/       # Paper draft (LaTeX)
 ├── experiments/    # Python code to reproduce results
-├── docs/           # Documentation site (Docusaurus)
-└── infra/          # AWS infrastructure (CDK TypeScript)
+└── docs/           # Documentation site (Docusaurus)
 ```
 
 ## Quick Start
@@ -61,7 +60,6 @@ packages/
 - Node.js >= 22
 - Yarn >= 4
 - Python >= 3.10
-- AWS CLI (for infrastructure deployment)
 
 ### Installation
 
@@ -90,7 +88,7 @@ uv sync
 uv sync --extra pytorch
 ```
 
-and 
+and
 
 ```bash
 yarn up "*"
@@ -113,15 +111,6 @@ Interactive documentation explaining the theory behind the methods, with tutoria
 ```bash
 yarn docs:dev    # Start dev server
 yarn docs:build  # Build for production
-```
-
-### Infrastructure (`packages/infra`)
-
-AWS CDK infrastructure for running experiments at scale using ECS/Fargate.
-
-```bash
-yarn infra:synth   # Synthesize CloudFormation
-yarn infra:deploy  # Deploy to AWS
 ```
 
 ## Contributing

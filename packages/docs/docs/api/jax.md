@@ -23,10 +23,10 @@ backend = JAXBackend(
 
 ### Parameters
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `dtype` | `str` | `'float32'` | Floating point precision |
-| `enable_x64` | `bool` | `True` | Enable 64-bit floating point |
+| Parameter    | Type   | Default     | Description                  |
+| ------------ | ------ | ----------- | ---------------------------- |
+| `dtype`      | `str`  | `'float32'` | Floating point precision     |
+| `enable_x64` | `bool` | `True`      | Enable 64-bit floating point |
 
 ### Enabling float64
 

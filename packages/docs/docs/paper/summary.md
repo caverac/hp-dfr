@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-sidebar_label: 'Background: Original DFR'
+sidebar_label: "Background: Original DFR"
 ---
 
 # Background: The Original DFR Method
@@ -91,19 +91,19 @@ The paper demonstrates strong correlation between the DFR loss and $H^1$ error d
 
 ### Loss-Error Correlation
 
-| Method | Correlation (Smooth) | Correlation (Singular) |
-|--------|---------------------|----------------------|
-| PINNs (L2) | 0.85 | 0.40 |
-| VPINNs | 0.88 | 0.55 |
-| DFR (H⁻¹) | **0.99** | **0.98** |
+| Method     | Correlation (Smooth) | Correlation (Singular) |
+| ---------- | -------------------- | ---------------------- |
+| PINNs (L2) | 0.85                 | 0.40                   |
+| VPINNs     | 0.88                 | 0.55                   |
+| DFR (H⁻¹)  | **0.99**             | **0.98**               |
 
 ### Final H1 Errors (Arctan Problem)
 
-| Method | H1 Error |
-|--------|----------|
-| PINNs | 2.3e-1 |
-| VPINNs | 1.8e-1 |
-| DFR | **4.2e-3** |
+| Method | H1 Error   |
+| ------ | ---------- |
+| PINNs  | 2.3e-1     |
+| VPINNs | 1.8e-1     |
+| DFR    | **4.2e-3** |
 
 ## Method Comparison
 

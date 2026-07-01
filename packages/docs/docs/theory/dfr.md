@@ -148,12 +148,12 @@ This ensures $u(0) = u(L) = 0$ exactly, regardless of the network output.
 
 ## Advantages Over PINNs
 
-| Aspect | PINNs | DFR |
-|--------|-------|-----|
-| **Loss-Error Correlation** | Weak | Strong |
-| **Regularity Requirement** | $H^2$ | $H^1$ |
-| **Error Estimation** | Indirect | Direct |
-| **Numerical Integration** | Random collocation | Fourier quadrature |
+| Aspect                     | PINNs              | DFR                |
+| -------------------------- | ------------------ | ------------------ |
+| **Loss-Error Correlation** | Weak               | Strong             |
+| **Regularity Requirement** | $H^2$              | $H^1$              |
+| **Error Estimation**       | Indirect           | Direct             |
+| **Numerical Integration**  | Random collocation | Fourier quadrature |
 
 ## When to Use DFR
 

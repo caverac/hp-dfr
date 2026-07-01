@@ -42,16 +42,16 @@ flowchart TD
 
 ## Summary Table
 
-| Feature | PINNs (Collocation) | DFR (Variational) |
-|---------|---------------------|-------------------|
-| **Formulation** | Strong | Weak |
-| **Loss Function** | $L^2$ residual | $H^{-1}$ residual |
-| **Integration** | Random collocation | Fourier quadrature |
-| **BC Enforcement** | Penalty term | Cutoff layer |
-| **Regularity Required** | $H^2$ | $H^1$ |
-| **Error-Loss Correlation** | Weak | Strong |
-| **Domain Support** | General | Rectangular |
-| **Implementation** | Simpler | More complex |
+| Feature                    | PINNs (Collocation) | DFR (Variational)  |
+| -------------------------- | ------------------- | ------------------ |
+| **Formulation**            | Strong              | Weak               |
+| **Loss Function**          | $L^2$ residual      | $H^{-1}$ residual  |
+| **Integration**            | Random collocation  | Fourier quadrature |
+| **BC Enforcement**         | Penalty term        | Cutoff layer       |
+| **Regularity Required**    | $H^2$               | $H^1$              |
+| **Error-Loss Correlation** | Weak                | Strong             |
+| **Domain Support**         | General             | Rectangular        |
+| **Implementation**         | Simpler             | More complex       |
 
 ## Benchmark Results
 
@@ -147,26 +147,29 @@ For complex problems, consider:
 
 ## Computational Cost Comparison
 
-| Operation | PINNs | DFR |
-|-----------|-------|-----|
-| Forward pass | $O(N)$ | $O(N)$ |
-| Gradient (autodiff) | $O(N)$ | $O(N)$ |
-| Loss computation | $O(N_{\text{colloc}})$ | $O(N_{\text{modes}} \log N_{\text{modes}})$ |
-| Memory | Lower | Higher (Fourier matrices) |
+| Operation           | PINNs                  | DFR                                         |
+| ------------------- | ---------------------- | ------------------------------------------- |
+| Forward pass        | $O(N)$                 | $O(N)$                                      |
+| Gradient (autodiff) | $O(N)$                 | $O(N)$                                      |
+| Loss computation    | $O(N_{\text{colloc}})$ | $O(N_{\text{modes}} \log N_{\text{modes}})$ |
+| Memory              | Lower                  | Higher (Fourier matrices)                   |
 
 ## Recommendations by Problem Type
 
 ### Elliptic PDEs (Poisson, etc.)
+
 - **Regular coefficients**: Either method works
 - **Discontinuous coefficients**: Use DFR
 - **Complex geometry**: Use PINNs
 
 ### Problems with Singularities
+
 - **Point sources**: DFR required
 - **Corner singularities**: DFR preferred
 - **Boundary layers**: DFR handles better
 
 ### High-Dimensional Problems
+
 - Both scale similarly
 - PINNs may be easier to implement
 - DFR provides better error estimates

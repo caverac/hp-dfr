@@ -90,25 +90,25 @@ page:
 
 ## Status
 
-| Component | Status |
-|-----------|--------|
-| Goal-oriented model + QoI classes | Implemented (`models/goal_oriented_dfr.py`), unit-tested |
-| Dense DFR Fourier machinery | Implemented and tested (`fourier/transforms.py`) |
-| 1D and 2D Poisson problems | Implemented (`problems/poisson_1d.py`, `problems/poisson_2d.py`) |
-| QoI-error-control theorem | Proved (Proposition 4.3 + Theorem 4.4 in the manuscript) |
-| 1D experiment (control) | Done &mdash; figure `dfr-saturation-1d` |
-| 2D experiment (advantage) | Done &mdash; figure `dfr-vs-go-2d` |
+| Component                         | Status                                                           |
+| --------------------------------- | ---------------------------------------------------------------- |
+| Goal-oriented model + QoI classes | Implemented (`models/goal_oriented_dfr.py`), unit-tested         |
+| Dense DFR Fourier machinery       | Implemented and tested (`fourier/transforms.py`)                 |
+| 1D and 2D Poisson problems        | Implemented (`problems/poisson_1d.py`, `problems/poisson_2d.py`) |
+| QoI-error-control theorem         | Proved (Proposition 4.3 + Theorem 4.4 in the manuscript)         |
+| 1D experiment (control)           | Done &mdash; figure `dfr-saturation-1d`                          |
+| 2D experiment (advantage)         | Done &mdash; figure `dfr-vs-go-2d`                               |
 
 ## References
 
 1. Taylor, J.M., Pardo, D., Muga, I. (2023). A Deep Fourier Residual Method for
-   solving PDEs using Neural Networks. *CMAME* **405**:115850.
+   solving PDEs using Neural Networks. _CMAME_ **405**:115850.
    [arXiv:2210.14129](https://arxiv.org/abs/2210.14129)
 2. Taylor, J.M., Bastidas, M., Calo, V.M., Pardo, D. (2024). Adaptive Deep Fourier
-   Residual method via overlapping domain decomposition. *CMAME*.
+   Residual method via overlapping domain decomposition. _CMAME_.
    [arXiv:2401.04663](https://arxiv.org/abs/2401.04663)
 3. Chakraborty, A., Wick, T., Zhuang, X., Rabczuk, T. (2021/2025).
    Multigoal-oriented dual-weighted-residual error estimation using deep neural
    networks. [arXiv:2112.11360](https://arxiv.org/abs/2112.11360)
 4. Becker, R., Rannacher, R. (2001). An optimal control approach to a posteriori
-   error estimation in finite element methods. *Acta Numerica* **10**, 1&ndash;102.
+   error estimation in finite element methods. _Acta Numerica_ **10**, 1&ndash;102.

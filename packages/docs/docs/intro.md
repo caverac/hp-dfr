@@ -6,7 +6,7 @@ sidebar_position: 1
 
 The Deep Fourier Residual (DFR) method solves partial differential equations with
 neural networks using a loss that is provably equivalent to the solution error.
-This project extends DFR to *goal-oriented* error control: when the object of
+This project extends DFR to _goal-oriented_ error control: when the object of
 interest is a single functional of the solution rather than the solution
 everywhere, the loss can be weighted toward that functional. This page states the
 problem, the method, and the main empirical finding, and points to the pages that
@@ -79,7 +79,7 @@ The method rests on two results, one theoretical and one empirical.
 The theorem is a goal-oriented analogue of the DFR guarantee: the QoI-weighted loss,
 together with a computable remainder, bounds the error in the quantity of interest,
 and every term of the bound is available during training. The remainder is a
-*product* of the primal and adjoint residuals, which is the source of the empirical
+_product_ of the primal and adjoint residuals, which is the source of the empirical
 behavior below.
 
 The experiments locate where goal-orientation helps. On 1D Poisson problems, plain
@@ -117,5 +117,5 @@ This work builds on the Deep Fourier Residual method:
 
 > **A Deep Fourier Residual Method for solving PDEs using Neural Networks.**
 > Jamie M. Taylor, David Pardo, Ignacio Muga.
-> *Computer Methods in Applied Mechanics and Engineering* **405** (2023) 115850.
+> _Computer Methods in Applied Mechanics and Engineering_ **405** (2023) 115850.
 > [arXiv:2210.14129](https://arxiv.org/abs/2210.14129)

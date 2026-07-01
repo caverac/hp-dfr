@@ -11,18 +11,12 @@
     "docs:build": "yarn workspace @hp-dfr/docs build",
     "docs:serve": "yarn workspace @hp-dfr/docs serve",
     "docs:nuke": "yarn workspace @hp-dfr/docs nuke",
-    "infra:synth": "yarn workspace @hp-dfr/infra cdk synth",
-    "infra:build": "yarn workspace @hp-dfr/infra build",
-    "infra:deploy": "yarn workspace @hp-dfr/infra cdk deploy --all",
-    "infra:destroy": "yarn workspace @hp-dfr/infra cdk destroy --all",
-    "infra:test": "yarn workspace @hp-dfr/infra test",
-    "infra:nuke": "yarn workspace @hp-dfr/infra nuke",
-    "lint": "eslint packages/docs/src packages/infra/lib packages/infra/bin",
-    "lint:fix": "eslint --fix packages/docs/src packages/infra/lib packages/infra/bin",
+    "lint": "eslint packages/docs/src",
+    "lint:fix": "eslint --fix packages/docs/src",
     "format": "prettier --check \"packages/**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:fix": "prettier --write \"packages/**/*.{ts,tsx,js,jsx,json,md}\"",
-    "typecheck": "yarn docs:build && yarn infra:build",
-    "nuke": "yarn docs:nuke && yarn infra:nuke && rm -rf node_modules yarn.lock"
+    "typecheck": "yarn docs:build",
+    "nuke": "yarn docs:nuke && rm -rf node_modules yarn.lock"
   },
   "keywords": [
     "pinns",
@@ -40,6 +34,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.0",
     "@commitlint/config-conventional": "^21.2.0",
+    "@eslint/js": "^10.0.1",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",

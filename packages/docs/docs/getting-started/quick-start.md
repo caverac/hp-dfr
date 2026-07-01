@@ -237,49 +237,49 @@ and their interpretation.
 
 ## Available Problems
 
-| Problem | CLI Name | Description | Best Method |
-|---------|----------|-------------|-------------|
-| Smooth sine | `sine` | $-u'' = 4\sin(2x)$ | Both work well |
-| Large gradients | `arctan` | Sharp transition layer | DFR preferred |
-| Discontinuous | `discontinuous` | Jump in coefficients | DFR |
-| Point source | `delta` | Delta function forcing | DFR |
+| Problem         | CLI Name        | Description            | Best Method    |
+| --------------- | --------------- | ---------------------- | -------------- |
+| Smooth sine     | `sine`          | $-u'' = 4\sin(2x)$     | Both work well |
+| Large gradients | `arctan`        | Sharp transition layer | DFR preferred  |
+| Discontinuous   | `discontinuous` | Jump in coefficients   | DFR            |
+| Point source    | `delta`         | Delta function forcing | DFR            |
 
 ## Command Reference
 
 ### Common Options (all methods)
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--backend` | tensorflow | Backend: tensorflow, pytorch, jax |
-| `--epochs` | 1000 | Training epochs |
-| `--lr` | 0.001 | Learning rate |
-| `--hidden-layers` | varies | Network architecture (comma-separated) |
-| `--seed` | 1234 | Random seed |
-| `--output` | None | Save plot to file |
-| `--plot/--no-plot` | True | Show plots |
+| Option             | Default    | Description                            |
+| ------------------ | ---------- | -------------------------------------- |
+| `--backend`        | tensorflow | Backend: tensorflow, pytorch, jax      |
+| `--epochs`         | 1000       | Training epochs                        |
+| `--lr`             | 0.001      | Learning rate                          |
+| `--hidden-layers`  | varies     | Network architecture (comma-separated) |
+| `--seed`           | 1234       | Random seed                            |
+| `--output`         | None       | Save plot to file                      |
+| `--plot/--no-plot` | True       | Show plots                             |
 
 ### PINNs-specific Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--n-collocation` | 1000 | Number of collocation points |
-| `--bc-weight` | 100.0 | Boundary condition penalty weight |
+| Option            | Default | Description                       |
+| ----------------- | ------- | --------------------------------- |
+| `--n-collocation` | 1000    | Number of collocation points      |
+| `--bc-weight`     | 100.0   | Boundary condition penalty weight |
 
 ### DFR-specific Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--n-modes` | 10 | Number of Fourier modes |
-| `--n-quadrature` | 100 | Quadrature points for integration |
+| Option           | Default | Description                       |
+| ---------------- | ------- | --------------------------------- |
+| `--n-modes`      | 10      | Number of Fourier modes           |
+| `--n-quadrature` | 100     | Quadrature points for integration |
 
 ### Goal-Oriented DFR Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--qoi` | point | Quantity of interest: `point` or `average` |
-| `--qoi-location` | 0.5 | Point-QoI location, relative in `[0, 1]` |
-| `--n-modes` | 10 | Fourier modes per dimension |
-| `--n-quadrature` | 100 | Quadrature points per dimension |
+| Option           | Default | Description                                |
+| ---------------- | ------- | ------------------------------------------ |
+| `--qoi`          | point   | Quantity of interest: `point` or `average` |
+| `--qoi-location` | 0.5     | Point-QoI location, relative in `[0, 1]`   |
+| `--n-modes`      | 10      | Fourier modes per dimension                |
+| `--n-quadrature` | 100     | Quadrature points per dimension            |
 
 ## Next Steps
 
