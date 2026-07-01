@@ -53,8 +53,14 @@ $$
 then:
 
 $$
-\|R\|_{H^{-1}}^2 = \sum_{k=1}^{N} \frac{\hat{R}_k^2}{1 + (k\pi/L)^2}
+\|R\|_{H^{-1}}^2 = \sum_{k=1}^{N} \frac{\hat{R}_k^2}{\lambda_k}, \qquad \lambda_k = \left(\frac{k\pi}{L}\right)^2
 $$
+
+where the $\lambda_k$ are the eigenvalues of the Dirichlet Laplacian, arising from the
+energy inner product $\langle u, v \rangle_V = \int_\Omega \nabla u \cdot \nabla v \, dx$ on
+the test space. In $d \geq 2$ dimensions the eigenvalue couples the axes through the sum
+of squared frequencies, $\lambda_{\mathbf{k}} = \sum_i (\pi k_i / L_i)^2$; it is **not** the
+product of the one-dimensional weights.
 
 ## DFR Loss Function
 
@@ -68,11 +74,11 @@ This is computed as:
 
 1. **Evaluate** the weak residual at quadrature points
 2. **Transform** using DST to get Fourier coefficients
-3. **Weight** by $(1 + k^2)^{-1}$ factors
+3. **Weight** by $\lambda_k^{-1}$ factors (inverse Dirichlet-Laplacian eigenvalues)
 4. **Sum** to get the squared $H^{-1}$ norm
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph Input
         U["u_θ(x)"]
     end
@@ -87,8 +93,8 @@ flowchart LR
     end
 
     subgraph Norm["H⁻¹ Norm"]
-        W["Weight: 1/(1+k²)"]
-        SUM["Σ w_k |R̂_k|²"]
+        W["Weight: 1/λ_k"]
+        SUM["Σ |R̂_k|² / λ_k"]
     end
 
     subgraph Output
@@ -104,7 +110,6 @@ flowchart LR
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch.fft import dst
 
 def weak_residual(
     model: nn.Module,
@@ -129,11 +134,14 @@ def weak_residual(
 
 def compute_h_minus_1_norm(
     residual_coeffs: Tensor,
-    modes: Tensor,
+    eigenvalues: Tensor,
 ) -> Tensor:
-    """Compute H⁻¹ norm using Fourier weighting."""
-    weights: Tensor = 1.0 / (1.0 + modes ** 2)
-    return torch.sum(weights * residual_coeffs ** 2)
+    """Compute the squared H⁻¹ norm from sine coefficients.
+
+    Weights by the inverse Dirichlet-Laplacian eigenvalues
+    lambda_k = sum_i (pi * k_i / L_i)^2.
+    """
+    return torch.sum(residual_coeffs ** 2 / eigenvalues)
 ```
 
 ## Boundary Condition Enforcement
@@ -188,7 +196,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
-from scipy.fft import dst
 
 class DFRModel(nn.Module):
     """Neural network with cutoff layer for homogeneous Dirichlet BCs."""
@@ -206,32 +213,36 @@ class DFRModel(nn.Module):
 def compute_dfr_loss(
     model: nn.Module,
     x_quad: Tensor,
-    fourier_modes: Tensor,
+    dst_matrix: Tensor,
+    eigenvalues: Tensor,
     f: Tensor,
-    quadrature_weights: Tensor,
 ) -> Tensor:
-    """Compute DFR loss as H⁻¹ norm of weak residual."""
+    """Compute DFR loss as the squared H⁻¹ norm of the weak residual.
+
+    For homogeneous Dirichlet BCs the weak residual tested against the sine
+    basis equals the strong residual ``r = u'' + f`` projected onto that basis.
+    The projection is a matrix multiply by a precomputed DST matrix (PyTorch has
+    no DST), which keeps the loss differentiable.
+    """
     x_quad.requires_grad_(True)
     u: Tensor = model(x_quad)
 
     du_dx: Tensor = torch.autograd.grad(
         u, x_quad, grad_outputs=torch.ones_like(u), create_graph=True
     )[0]
+    d2u_dx2: Tensor = torch.autograd.grad(
+        du_dx, x_quad, grad_outputs=torch.ones_like(du_dx), create_graph=True
+    )[0]
 
-    # Weak residual at quadrature points
-    weak_res: Tensor = du_dx - f  # Simplified for illustration
+    # Strong residual for -u'' = f (equals the weak residual on the sine basis).
+    strong_res: Tensor = d2u_dx2 + f
 
-    # Apply DST to get Fourier coefficients
-    coeffs: Tensor = torch.fft.dst(weak_res, type=1)
-
-    # Compute H⁻¹ norm with Fourier weighting
-    weights: Tensor = 1.0 / (1.0 + fourier_modes ** 2)
-    h_minus_1_norm_sq: Tensor = torch.sum(weights * coeffs ** 2)
-
-    return h_minus_1_norm_sq
+    # Sine coefficients R̂_k, then squared H⁻¹ norm Σ |R̂_k|² / λ_k.
+    coeffs: Tensor = dst_matrix @ strong_res
+    return torch.sum(coeffs ** 2 / eigenvalues)
 ```
 
 ## References
 
-- [Taylor, Pardo, Muga (2022)](https://arxiv.org/abs/2210.14129) - Original DFR paper
-- [Kharazmi et al. (2019)](https://arxiv.org/abs/1912.00873) - VPINNs
+- [Taylor, Pardo, Muga (2023)](https://arxiv.org/abs/2210.14129) - Original DFR paper
+- [Kharazmi et al. (2021)](https://arxiv.org/abs/1912.00873) - hp-VPINNs

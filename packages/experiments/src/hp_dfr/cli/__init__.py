@@ -11,6 +11,7 @@ import click
 from hp_dfr.figures import make_all_figures
 
 from .common import list_backends_table
+from .data import data
 from .dfr import dfr
 from .pinns import pinns
 from .research import research
@@ -25,6 +26,8 @@ def main() -> None:
     hp-dfr pinns run ...       PINNs baseline
     hp-dfr dfr run ...         DFR reference paper
     hp-dfr research run ...    Goal-Oriented DFR
+    hp-dfr data all            Generate preprint sweep data
+    hp-dfr figures             Build preprint figures from saved data
     hp-dfr backends            List available backends
     """
 
@@ -33,6 +36,7 @@ def main() -> None:
 main.add_command(pinns)
 main.add_command(dfr)
 main.add_command(research)
+main.add_command(data)
 
 
 @main.command()

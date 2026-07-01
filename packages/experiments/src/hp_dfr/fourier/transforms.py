@@ -8,13 +8,15 @@ Transform Types:
     - DST-I: For homogeneous Dirichlet BCs (u = 0 on boundary)
     - DCT-I: For homogeneous Neumann BCs (du/dn = 0 on boundary)
 
-The H^{-1} norm is computed as:
-    ||f||_{H^{-1}}^2 = sum_k |f_k|^2 / (1 + |k|^2 * pi^2 / L^2)
+The H^{-1} norm uses the energy inner product on H^1_0, so it weights by the
+inverse Dirichlet-Laplacian eigenvalues:
+    ||f||_{H^{-1}}^2 = sum_k |f_k|^2 / lambda_k,   lambda_k = sum_i (pi k_i / L_i)^2
 
-where f_k are the Fourier coefficients.
+where f_k are the sine coefficients. Note lambda_k couples the axes through the
+sum of squared frequencies; it is not the product of the one-dimensional weights.
 
 References:
-    - Taylor et al. (2022). A Deep Fourier Residual Method.
+    - Taylor et al. (2023). A Deep Fourier Residual Method.
     - Briggs & Henson (1995). The DFT: An Owner's Manual.
 """
 

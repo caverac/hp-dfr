@@ -73,6 +73,8 @@ $$
 
 **Result**: DFR significantly outperforms PINNs. The large forcing term in $L^2$ creates optimization difficulties for PINNs.
 
+> This project's own `arctan` benchmark uses a gentler steepness $k = 8$ with an affine correction so that $u(0) = u(1) = 0$; see the [preprint](/docs/preprint).
+
 ### Model Problem 3: Discontinuous Coefficients
 
 $$
@@ -130,11 +132,14 @@ Choose DFR when:
 import torch
 from torch import Tensor
 
-def dfr_loss(weak_residual: Tensor, fourier_modes: Tensor) -> Tensor:
-    """DFR loss: H⁻¹ norm provides error-equivalent loss."""
-    coeffs: Tensor = torch.fft.dst(weak_residual, type=1)
-    weights: Tensor = 1.0 / (1.0 + fourier_modes ** 2)
-    return torch.sum(weights * coeffs ** 2)
+def dfr_loss(weak_residual: Tensor, dst_matrix: Tensor, eigenvalues: Tensor) -> Tensor:
+    """DFR loss: squared H⁻¹ norm gives an error-equivalent loss.
+
+    Sine coefficients come from a precomputed DST matrix (PyTorch has no DST);
+    eigenvalues are the Dirichlet-Laplacian weights lambda_k = sum_i (pi k_i / L_i)^2.
+    """
+    coeffs: Tensor = dst_matrix @ weak_residual
+    return torch.sum(coeffs ** 2 / eigenvalues)
 ```
 
 ## Hybrid Approaches
@@ -151,7 +156,7 @@ For complex problems, consider:
 | ------------------- | ---------------------- | ------------------------------------------- |
 | Forward pass        | $O(N)$                 | $O(N)$                                      |
 | Gradient (autodiff) | $O(N)$                 | $O(N)$                                      |
-| Loss computation    | $O(N_{\text{colloc}})$ | $O(N_{\text{modes}} \log N_{\text{modes}})$ |
+| Loss computation    | $O(N_{\text{colloc}})$ | $O(N_{\text{modes}} \cdot N_{\text{quad}})$ |
 | Memory              | Lower                  | Higher (Fourier matrices)                   |
 
 ## Recommendations by Problem Type
@@ -208,26 +213,27 @@ def pinns_loss(
 def dfr_loss(
     model: nn.Module,
     x_quadrature: Tensor,
-    fourier_modes: Tensor,
-    quadrature_weights: Tensor,
+    dst_matrix: Tensor,
+    eigenvalues: Tensor,
     f: Tensor,
 ) -> Tensor:
-    """DFR approach: H⁻¹ norm of weak residual."""
+    """DFR approach: squared H⁻¹ norm of the weak residual."""
     x_quadrature.requires_grad_(True)
     u: Tensor = model(x_quadrature)
 
     du_dx: Tensor = torch.autograd.grad(
         u, x_quadrature, grad_outputs=torch.ones_like(u), create_graph=True
     )[0]
+    d2u_dx2: Tensor = torch.autograd.grad(
+        du_dx, x_quadrature, grad_outputs=torch.ones_like(du_dx), create_graph=True
+    )[0]
 
-    # Weak residual (simplified)
-    weak_res: Tensor = du_dx * quadrature_weights - f * quadrature_weights
+    # Strong residual for -u'' = f (equals the weak residual on the sine basis).
+    strong_res: Tensor = d2u_dx2 + f
 
-    # Fourier transform and weighting
-    fourier_coeffs: Tensor = torch.fft.dst(weak_res, type=1)
-    weights: Tensor = 1.0 / (1.0 + fourier_modes ** 2)
-
-    return torch.sum(weights * fourier_coeffs ** 2)
+    # Sine coefficients, then weight by inverse Dirichlet-Laplacian eigenvalues.
+    coeffs: Tensor = dst_matrix @ strong_res
+    return torch.sum(coeffs ** 2 / eigenvalues)
 ```
 
 ## Further Reading

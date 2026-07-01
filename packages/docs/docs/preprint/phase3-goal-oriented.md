@@ -3,6 +3,8 @@ sidebar_position: 3
 sidebar_label: "Method and Results"
 ---
 
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
 # Goal-Oriented DFR: Method and Results
 
 This page develops the method, states the error guarantee, and presents the 1D and
@@ -79,7 +81,7 @@ equivalence, under the standard well-posedness hypotheses (the
 Banach&ndash;Necas&ndash;Babuska conditions: a boundedness constant $M$ and an
 inf&ndash;sup constant $\gamma$).
 
-**Exact error representation (Proposition 4.3).** For any primal $u_h$ and adjoint
+**Exact error representation (Proposition 4.2).** For any primal $u_h$ and adjoint
 $z_h$,
 
 $$
@@ -90,7 +92,7 @@ $$
 The first term is the goal-oriented loss; the second involves the unknown exact
 adjoint and is bounded next.
 
-**QoI error control (Theorem 4.4).**
+**QoI error control (Theorem 4.3).**
 
 $$
 \bigl| J(u) - J(u_h) \bigr|
@@ -126,14 +128,20 @@ seed min&ndash;max.
 The 1D problems are a smooth solution ($u = \sin 2x$) and a sharp one (an $\arctan$
 profile with its gradient concentrated near the center).
 
-![QoI error versus degrees of freedom in 1D, for plain DFR and goal-oriented DFR, on a smooth (top) and a sharp (bottom) problem.](/img/figures/dfr-saturation-1d.png)
+<figure class="scientific">
+  <img src={useBaseUrl('/img/figures/dfr-saturation-1d.png')} alt="QoI error versus degrees of freedom in 1D for plain DFR and goal-oriented DFR" />
+  <figcaption>QoI error versus primal-network degrees of freedom on the 1D Poisson
+  problems (smooth, top; sharp, bottom). Plain DFR reaches its optimization floor at the
+  smallest networks, so goal-orientation offers no advantage. Markers are medians over
+  random seeds; bands span the seed min&ndash;max.</figcaption>
+</figure>
 
 Reproduce with:
 
 ```bash
 # 1. Generate the sweep data (requires a PyTorch backend; a few minutes).
 #    On Intel macOS, install the backend once: uv pip install 'torch>=2.0.0,<2.2.0'
-KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_1d_data.py
+uv run hp-dfr data 1d
 
 # 2. Build the figure from the saved data (fast).
 uv run hp-dfr figures
@@ -158,13 +166,19 @@ effect of goal-orientation. Unlike the 1D problems, a network of practical size 
 not resolve this solution everywhere: plain DFR sits at a QoI error of $10^{-4}$ at
 the smallest networks and only reaches $10^{-5}$ as the width grows.
 
-![QoI error versus degrees of freedom in 2D, for plain DFR and goal-oriented DFR.](/img/figures/dfr-vs-go-2d.png)
+<figure class="scientific">
+  <img src={useBaseUrl('/img/figures/dfr-vs-go-2d.png')} alt="QoI error versus degrees of freedom in 2D for plain DFR and goal-oriented DFR" />
+  <figcaption>QoI error versus primal-network degrees of freedom on the 2D sharp-bump
+  Poisson problem. In this resolution-limited regime goal-oriented DFR improves the
+  point-QoI error by roughly three to five times at matched degrees of freedom. Markers
+  are medians over random seeds; bands span the seed min&ndash;max.</figcaption>
+</figure>
 
 Reproduce with:
 
 ```bash
 # 1. Generate the 2D sweep data (requires a PyTorch backend; ~15 minutes).
-KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_2d_data.py
+uv run hp-dfr data 2d
 
 # 2. Build the figure from the saved data (fast).
 uv run hp-dfr figures
@@ -191,7 +205,7 @@ DFR happens to resolve the bump particularly well.
 
 ### Why the two regimes differ
 
-The contrast follows from the second-order remainder in Theorem 4.4. When plain DFR
+The contrast follows from the second-order remainder in Theorem 4.3. When plain DFR
 already drives the primal residual to its floor (1D), the remainder is negligible and
 there is no error to reallocate; the extra adjoint network only complicates the
 optimization. When the primal residual cannot be made uniformly small at feasible
@@ -218,7 +232,7 @@ A command-line run:
 
 ```bash
 # Goal-oriented DFR on the 1D sharp problem, point QoI at the 65% location.
-KERAS_BACKEND=torch uv run hp-dfr research run \
+uv run hp-dfr research run \
   --problem arctan --backend pytorch \
   --qoi point --qoi-location 0.65 \
   --hidden-layers "16,16" --n-modes 60 --epochs 2000

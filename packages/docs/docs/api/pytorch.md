@@ -4,279 +4,144 @@ sidebar_position: 3
 
 # PyTorch Backend
 
-API reference for the PyTorch backend implementation.
+`hp-dfr` exposes a single model API; the compute backend is selected with the
+`backend="pytorch"` argument. Internally the PyTorch backend uses `torch.autograd`
+for the derivatives in the PDE residual. PyTorch is the backend used for the
+experiments in the [preprint](/docs/preprint).
 
-## Overview
+## Installation
 
-The PyTorch backend uses PyTorch's `autograd` system for automatic differentiation and provides a familiar object-oriented API.
+The PyTorch backend is an optional dependency group:
 
-## Backend Class
-
-```python
-from dfr_pinns.backends import PyTorchBackend
-
-backend = PyTorchBackend(
-    dtype='float64',
-    device='cuda:0'  # or 'cpu'
-)
+```bash
+uv pip install 'hp-dfr[pytorch]'
 ```
 
-### Parameters
+Check which backends are importable at any time:
 
-| Parameter | Type  | Default     | Description              |
-| --------- | ----- | ----------- | ------------------------ |
-| `dtype`   | `str` | `'float64'` | Floating point precision |
-| `device`  | `str` | `'cpu'`     | Device for computation   |
+```bash
+uv run hp-dfr backends
+```
 
-## Model Construction
+## Selecting the backend
+
+Every model takes a `backend` string, one of `"tensorflow"`, `"jax"`, or
+`"pytorch"`; an unknown value raises `ValueError`. The rest of the API
+(`build`, `fit`, `predict`) is identical across backends, so switching backends is
+a one-argument change.
+
+## Models
+
+### PINNs
+
+```python
+import numpy as np
+from hp_dfr.models import PINNsModel
+from hp_dfr.problems import poisson_1d
+
+problem = poisson_1d.get_problem("sine")
+
+model = PINNsModel(
+    hidden_layers=(64, 64, 64),
+    activation="tanh",
+    n_collocation=1000,
+    bc_weight=100.0,
+    backend="pytorch",
+    seed=1234,
+)
+model.build()
+history = model.fit(problem, epochs=1000, learning_rate=1e-3, verbose=True)
+
+x = np.linspace(problem.domain[0], problem.domain[1], 200)
+u = model.predict(x)
+```
+
+`fit` returns a history dict with a `"loss"` key; `predict` returns a NumPy array.
+
+### DFR
+
+```python
+from hp_dfr.models import DFRModel
+from hp_dfr.problems import poisson_1d
+
+problem = poisson_1d.get_problem("arctan")
+
+model = DFRModel(
+    hidden_layers=(10, 10, 10, 10),
+    n_fourier_modes=10,
+    n_quadrature=100,
+    backend="pytorch",
+    dim=1,
+)
+model.build()
+# DFR supports an optional LBFGS polish after Adam (lbfgs_iters=0 disables it):
+history = model.fit(problem, epochs=2000, learning_rate=1e-3, lbfgs_iters=400)
+```
+
+For a 2D problem, pass `dim=2` and a 2D problem instance:
+
+```python
+from hp_dfr.problems.poisson_2d import ArcTanBump2D
+
+model = DFRModel(hidden_layers=(16, 16), n_fourier_modes=16, n_quadrature=32, backend="pytorch", dim=2)
+model.build()  # input_dim defaults to the model's dim
+history = model.fit(ArcTanBump2D(steepness=8.0), epochs=3000, learning_rate=3e-3, lbfgs_iters=500)
+```
+
+### Goal-oriented DFR
+
+```python
+import numpy as np
+from hp_dfr.models import GoalOrientedDFRModel, PointEvaluationQoI
+from hp_dfr.problems import poisson_1d
+
+problem = poisson_1d.get_problem("arctan")
+a, b = problem.domain
+qoi = PointEvaluationQoI(point=np.array([a + 0.65 * (b - a)]), sigma=0.04)
+
+model = GoalOrientedDFRModel(
+    hidden_layers=(16, 16),
+    dim=1,
+    qoi=qoi,
+    n_modes=60,
+    n_quadrature=150,
+    adjoint_weight=1.0,
+    primal_weight=1.0,
+    backend="pytorch",
+)
+model.build()
+history = model.fit(problem, epochs=2000, learning_rate=2e-3)
+
+qoi_value = qoi.evaluate(model.predict, problem.domain)
+```
+
+The available quantity-of-interest classes are `PointEvaluationQoI`,
+`AverageValueQoI`, and `BoundaryFluxQoI`, all importable from `hp_dfr.models`.
+
+## Differentiation
+
+You do not write the autodiff yourself; the model assembles the residual with
+`torch.autograd`. For reference, the derivatives entering the strong residual are
+obtained with `torch.autograd.grad`:
 
 ```python
 import torch
-import torch.nn as nn
 
-class PINNsNetwork(nn.Module):
-    def __init__(self, hidden_layers=[10, 10, 10, 10], activation='tanh'):
-        super().__init__()
-
-        layers = []
-        input_dim = 1
-
-        for hidden_dim in hidden_layers:
-            layers.append(nn.Linear(input_dim, hidden_dim))
-            if activation == 'tanh':
-                layers.append(nn.Tanh())
-            elif activation == 'relu':
-                layers.append(nn.ReLU())
-            input_dim = hidden_dim
-
-        layers.append(nn.Linear(input_dim, 1))
-        self.network = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.network(x)
-```
-
-### With Cutoff Layer (for DFR)
-
-```python
-class DFRNetwork(nn.Module):
-    def __init__(self, hidden_layers=[10, 10, 10, 10], domain=(0, torch.pi)):
-        super().__init__()
-        self.domain = domain
-        self.network = PINNsNetwork(hidden_layers)
-
-    def forward(self, x):
-        # Cutoff for homogeneous Dirichlet BCs
-        a, b = self.domain
-        cutoff = (x - a) * (b - x)
-        return cutoff * self.network(x)
-```
-
-## Automatic Differentiation
-
-PyTorch uses `autograd.grad` for computing derivatives:
-
-```python
-def compute_derivatives(model, x):
-    """Compute first and second derivatives."""
+def derivatives(model, x):
     x = x.requires_grad_(True)
-
     u = model(x)
-
-    # First derivative
-    du_dx = torch.autograd.grad(
-        u, x,
-        grad_outputs=torch.ones_like(u),
-        create_graph=True
-    )[0]
-
-    # Second derivative
-    d2u_dx2 = torch.autograd.grad(
-        du_dx, x,
-        grad_outputs=torch.ones_like(du_dx),
-        create_graph=True
-    )[0]
-
+    du_dx = torch.autograd.grad(u, x, torch.ones_like(u), create_graph=True)[0]
+    d2u_dx2 = torch.autograd.grad(du_dx, x, torch.ones_like(du_dx), create_graph=True)[0]
     return u, du_dx, d2u_dx2
 ```
 
-## Loss Computation
+## Notes
 
-### PINNs Loss
-
-```python
-def pinns_loss(model, x_colloc, x_boundary, forcing_fn, bc_weight=100.0):
-    """Compute PINNs collocation loss."""
-    x_colloc = x_colloc.requires_grad_(True)
-
-    # Forward pass
-    u = model(x_colloc)
-
-    # Compute second derivative
-    du_dx = torch.autograd.grad(
-        u, x_colloc,
-        grad_outputs=torch.ones_like(u),
-        create_graph=True
-    )[0]
-
-    d2u_dx2 = torch.autograd.grad(
-        du_dx, x_colloc,
-        grad_outputs=torch.ones_like(du_dx),
-        create_graph=True
-    )[0]
-
-    # PDE residual: u'' + f = 0
-    f = forcing_fn(x_colloc)
-    residual = d2u_dx2 + f
-    pde_loss = torch.mean(residual**2)
-
-    # Boundary loss
-    u_bc = model(x_boundary)
-    bc_loss = torch.mean(u_bc**2)
-
-    return pde_loss + bc_weight * bc_loss
-```
-
-### DFR Loss
-
-```python
-def dfr_loss(model, x_quad, dst_matrix, h_minus_1_weights, forcing_fn):
-    """Compute DFR loss using H^-1 norm."""
-    x_quad = x_quad.requires_grad_(True)
-
-    # Forward pass (model includes cutoff)
-    u = model(x_quad)
-
-    # Compute derivative
-    du_dx = torch.autograd.grad(
-        u, x_quad,
-        grad_outputs=torch.ones_like(u),
-        create_graph=True
-    )[0]
-
-    # Forcing term
-    f = forcing_fn(x_quad)
-
-    # Weak residual (simplified for 1D)
-    weak_res = du_dx  # Would include test function integration
-
-    # Transform to Fourier space
-    fourier_coeffs = dst_matrix.T @ weak_res
-
-    # H^-1 norm
-    loss = torch.sum(h_minus_1_weights * fourier_coeffs**2)
-
-    return loss
-```
-
-## Training
-
-### Basic Training Loop
-
-```python
-model = PINNsNetwork()
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
-# Domain
-domain = (0, torch.pi)
-x_boundary = torch.tensor([[domain[0]], [domain[1]]], dtype=torch.float64)
-
-def forcing_fn(x):
-    return 4 * torch.sin(2 * x)
-
-# Training loop
-for epoch in range(1000):
-    optimizer.zero_grad()
-
-    # Random collocation points
-    x_colloc = torch.rand(100, 1) * torch.pi
-
-    loss = pinns_loss(model, x_colloc, x_boundary, forcing_fn)
-    loss.backward()
-    optimizer.step()
-
-    if epoch % 100 == 0:
-        print(f"Epoch {epoch}: Loss = {loss.item():.6f}")
-```
-
-### With Learning Rate Scheduler
-
-```python
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.1)
-
-for epoch in range(2000):
-    optimizer.zero_grad()
-    x_colloc = torch.rand(100, 1) * torch.pi
-    loss = pinns_loss(model, x_colloc, x_boundary, forcing_fn)
-    loss.backward()
-    optimizer.step()
-    scheduler.step()
-```
-
-### With LBFGS Optimizer
-
-LBFGS often works better for PINNs:
-
-```python
-optimizer = torch.optim.LBFGS(
-    model.parameters(),
-    lr=1.0,
-    max_iter=20,
-    history_size=50,
-    line_search_fn='strong_wolfe'
-)
-
-def closure():
-    optimizer.zero_grad()
-    loss = pinns_loss(model, x_colloc, x_boundary, forcing_fn)
-    loss.backward()
-    return loss
-
-for epoch in range(100):
-    loss = optimizer.step(closure)
-    print(f"Epoch {epoch}: Loss = {loss.item():.6f}")
-```
-
-## GPU Configuration
-
-```python
-# Check CUDA availability
-print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"Device count: {torch.cuda.device_count()}")
-
-# Move model to GPU
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-model = model.to(device)
-
-# Move data to GPU
-x_colloc = x_colloc.to(device)
-x_boundary = x_boundary.to(device)
-```
-
-## Mixed Precision Training
-
-```python
-from torch.cuda.amp import autocast, GradScaler
-
-scaler = GradScaler()
-
-for epoch in range(1000):
-    optimizer.zero_grad()
-
-    with autocast():
-        loss = pinns_loss(model, x_colloc, x_boundary, forcing_fn)
-
-    scaler.scale(loss).backward()
-    scaler.step(optimizer)
-    scaler.update()
-```
-
-## Known Issues
-
-:::caution
-The PyTorch backend may produce slightly different results compared to TensorFlow and JAX backends. This is under investigation. See [GitHub Issue #X](https://github.com/mathmode/pinns-dfr/issues/X).
-:::
+- **Precision.** Models default to `dtype="float64"`, which PyTorch supports natively.
+- **Intel macOS.** Install the backend as `torch>=2.0.0,<2.2.0` (this pin is encoded
+  in the package's `pytorch` extra); other platforms use `torch>=2.5.1`.
+- **Device.** The current model API does not expose a device argument; training runs
+  on CPU.
 
 ## See Also
 

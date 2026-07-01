@@ -25,7 +25,7 @@ flowchart TD
     subgraph Foundation["Foundational Methods"]
         PINN["PINNs (2019)"]
         VPINN["VPINNs"]
-        DFR["DFR (2022)"]
+        DFR["DFR (2023)"]
     end
 
     subgraph Adaptive["Adaptive Methods"]
@@ -57,7 +57,7 @@ flowchart TD
 
 ## 1. Deep Fourier Residual Methods
 
-### 1.1 Original DFR Method (2022)
+### 1.1 Original DFR Method (2023)
 
 The foundational work by Taylor, Pardo, and Muga establishes the Deep Fourier Residual method.
 
@@ -283,7 +283,7 @@ Combines tensor structures with a posteriori error estimators for high-dimension
 
 ### 5.3 Sparse Grid Methods (Classical)
 
-The foundational work on sparse grids provides the mathematical basis for sparse Fourier approaches to the curse of dimensionality (one of the directions this project set aside).
+The foundational work on sparse grids provides the mathematical basis for sparse Fourier approaches to the curse of dimensionality (a direction outside this project's scope).
 
 **Key Reference**: Bungartz, H.J., Griebel, M. (2004). Sparse grids. Acta Numerica, 13, 147-269.
 
@@ -337,17 +337,16 @@ SA-PINN: Local sensitivity analysis via loss function regularization.
 
 ## How this project is scoped
 
-A review (June 2026; see `notebooks/notes/logs/20260629-idea-reframing.md`) narrowed
-this project from three proposed extensions to one. The two set aside, and why:
+This project focuses on goal-oriented DFR. Two adjacent directions are out of scope:
 
 - **Sparse / hyperbolic-cross DFR** is signposted as future work by the DFR
   authors, the $O(N (\log N)^{d-1})$ speedup is unsound for a non-separable
   neural-network residual, and sparse truncation breaks the two-sided
-  error-loss equivalence. Discarded.
+  error-loss equivalence.
 - **hp-adaptive / domain-decomposition DFR** is largely pre-empted by Adaptive
   DFR (arXiv:2401.04663), which already provides local DFR losses, Dorfler
-  marking, residual-based refinement, and equivalence theory. Discarded as a
-  flagship; the only daylight (local networks + mortar coupling + 3D) is narrow.
+  marking, residual-based refinement, and equivalence theory; the remaining gap
+  (local networks + mortar coupling + 3D) is narrow.
 
 ### The gap we address: Goal-Oriented DFR
 
@@ -373,7 +372,7 @@ we extend - not claimed as novel.
 
 ### Primary Sources (DFR)
 
-1. Taylor, J.M., Pardo, D., Muga, I. (2022). A Deep Fourier Residual Method for solving PDEs using Neural Networks. [arXiv:2210.14129](https://arxiv.org/abs/2210.14129)
+1. Taylor, J.M., Pardo, D., Muga, I. (2023). A Deep Fourier Residual Method for solving PDEs using Neural Networks. _CMAME_ **405**:115850. [arXiv:2210.14129](https://arxiv.org/abs/2210.14129)
 
 2. Taylor, J.M., et al. (2024). Adaptive Deep Fourier Residual method via overlapping domain decomposition. [arXiv:2401.04663](https://arxiv.org/abs/2401.04663)
 

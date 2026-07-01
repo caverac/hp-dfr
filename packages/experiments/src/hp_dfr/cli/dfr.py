@@ -3,7 +3,6 @@
 Reference paper: "A Deep Fourier Residual Method for solving PDEs using Neural Networks"
 """
 
-import os
 from pathlib import Path
 
 import click
@@ -114,64 +113,6 @@ def run(
 def problems() -> None:
     """List available problems for DFR experiments."""
     list_problems_table(PROBLEM_DESCRIPTIONS)
-
-
-@dfr.command()
-@click.option(
-    "--output-dir",
-    default="results/dfr_paper",
-    help="Output directory for reproduced results",
-)
-@click.option(
-    "--problems",
-    "problem_spec",
-    default="all",
-    help="Problems to reproduce (comma-separated or 'all')",
-)
-def reproduce(output_dir: str, problem_spec: str) -> None:
-    """Reproduce results from the reference DFR paper.
-
-    Runs the benchmark problems from the original paper with the same
-    hyperparameters and saves results for comparison.
-    """
-    console.print("[bold blue]Reproducing DFR paper results...[/bold blue]")
-    console.print(f"Output directory: {output_dir}")
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    problem_list: list[str]
-    if problem_spec == "all":
-        problem_list = [str(p) for p in PROBLEM_DESCRIPTIONS]
-    else:
-        problem_list = [p.strip() for p in problem_spec.split(",")]
-
-    console.print(f"Problems: {', '.join(problem_list)}")
-
-    # Paper hyperparameters (from reference)
-    paper_config = {
-        "sine": {"n_modes": 10, "hidden_layers": [10, 10, 10, 10], "epochs": 10000},
-        "arctan": {"n_modes": 20, "hidden_layers": [20, 20, 20, 20], "epochs": 20000},
-        "discontinuous": {
-            "n_modes": 30,
-            "hidden_layers": [30, 30, 30, 30],
-            "epochs": 30000,
-        },
-        "delta": {"n_modes": 40, "hidden_layers": [40, 40, 40, 40], "epochs": 40000},
-    }
-
-    for prob_name in problem_list:
-        if prob_name not in paper_config:
-            console.print(f"[yellow]Unknown problem: {prob_name}, skipping[/yellow]")
-            continue
-
-        config = paper_config[prob_name]
-        console.print(f"\n[cyan]Running {prob_name}...[/cyan]")
-
-        # TODO: Implement full paper reproduction with proper metrics
-        console.print(f"  Config: {config}")
-        console.print("[yellow]  Full reproduction not yet implemented[/yellow]")
-
-    console.print(f"\n[green]Results will be saved to {output_dir}/[/green]")
 
 
 def _plot_results(

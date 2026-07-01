@@ -4,70 +4,127 @@ sidebar_position: 1
 
 # TensorFlow Backend
 
-API reference for the TensorFlow backend implementation.
+`hp-dfr` exposes a single model API; the compute backend is selected with the
+`backend="tensorflow"` argument. The TensorFlow backend builds the networks with
+Keras and differentiates the residual with `tf.GradientTape`. It is the default
+`dtype`-and-backend combination in the package.
 
-## Overview
+## Installation
 
-The TensorFlow backend uses Keras Core for model construction and TensorFlow's `GradientTape` for automatic differentiation.
+The TensorFlow backend is an optional dependency group:
 
-## Backend Class
-
-```python
-from dfr_pinns.backends import TensorFlowBackend
-
-backend = TensorFlowBackend(
-    dtype='float64',  # Precision: 'float32' or 'float64'
-    device='gpu:0'    # Device placement
-)
+```bash
+uv pip install 'hp-dfr[tensorflow]'
 ```
 
-### Parameters
+Check which backends are importable at any time:
 
-| Parameter | Type  | Default     | Description              |
-| --------- | ----- | ----------- | ------------------------ |
-| `dtype`   | `str` | `'float64'` | Floating point precision |
-| `device`  | `str` | `None`      | Device for computation   |
+```bash
+uv run hp-dfr backends
+```
 
-## Model Construction
+## Selecting the backend
 
-### PINNs Model
+Every model takes a `backend` string, one of `"tensorflow"`, `"jax"`, or
+`"pytorch"`; an unknown value raises `ValueError`. The rest of the API
+(`build`, `fit`, `predict`) is identical across backends. `"tensorflow"` is the
+default, so it may be omitted.
+
+## Models
+
+### PINNs
 
 ```python
-from dfr_pinns.models import PINNsModel
+import numpy as np
+from hp_dfr.models import PINNsModel
+from hp_dfr.problems import poisson_1d
+
+problem = poisson_1d.get_problem("sine")
 
 model = PINNsModel(
-    backend=TensorFlowBackend(),
-    input_dim=1,
-    output_dim=1,
-    hidden_layers=[10, 10, 10, 10],
-    activation='tanh'
+    hidden_layers=(64, 64, 64),
+    activation="tanh",
+    n_collocation=1000,
+    bc_weight=100.0,
+    backend="tensorflow",
+    seed=1234,
 )
+model.build()
+history = model.fit(problem, epochs=1000, learning_rate=1e-3, verbose=True)
+
+x = np.linspace(problem.domain[0], problem.domain[1], 200)
+u = model.predict(x)
 ```
 
-### DFR Model
+`fit` returns a history dict with a `"loss"` key; `predict` returns a NumPy array.
+
+### DFR
 
 ```python
-from dfr_pinns.models import DFRModel
+from hp_dfr.models import DFRModel
+from hp_dfr.problems import poisson_1d
+
+problem = poisson_1d.get_problem("arctan")
 
 model = DFRModel(
-    backend=TensorFlowBackend(),
-    input_dim=1,
-    output_dim=1,
-    hidden_layers=[10, 10, 10, 10],
-    activation='tanh',
+    hidden_layers=(10, 10, 10, 10),
     n_fourier_modes=10,
-    n_quadrature=100
+    n_quadrature=100,
+    backend="tensorflow",
+    dim=1,
 )
+model.build()
+history = model.fit(problem, epochs=2000, learning_rate=1e-3)
 ```
 
-## Automatic Differentiation
+For a 2D problem, pass `dim=2` and a 2D problem instance:
 
-The TensorFlow backend computes derivatives using `GradientTape`:
+```python
+from hp_dfr.problems.poisson_2d import ArcTanBump2D
+
+model = DFRModel(hidden_layers=(16, 16), n_fourier_modes=16, n_quadrature=32, backend="tensorflow", dim=2)
+model.build()  # input_dim defaults to the model's dim
+history = model.fit(ArcTanBump2D(steepness=8.0), epochs=3000, learning_rate=3e-3)
+```
+
+### Goal-oriented DFR
+
+```python
+import numpy as np
+from hp_dfr.models import GoalOrientedDFRModel, PointEvaluationQoI
+from hp_dfr.problems import poisson_1d
+
+problem = poisson_1d.get_problem("arctan")
+a, b = problem.domain
+qoi = PointEvaluationQoI(point=np.array([a + 0.65 * (b - a)]), sigma=0.04)
+
+model = GoalOrientedDFRModel(
+    hidden_layers=(16, 16),
+    dim=1,
+    qoi=qoi,
+    n_modes=60,
+    n_quadrature=150,
+    backend="tensorflow",
+)
+model.build()
+history = model.fit(problem, epochs=2000, learning_rate=2e-3)
+
+qoi_value = qoi.evaluate(model.predict, problem.domain)
+```
+
+The available quantity-of-interest classes are `PointEvaluationQoI`,
+`AverageValueQoI`, and `BoundaryFluxQoI`, all importable from `hp_dfr.models`.
+
+## Differentiation
+
+You do not write the autodiff yourself; the model assembles the residual with
+`tf.GradientTape`. For reference, the derivatives entering the strong residual use
+nested tapes:
 
 ```python
 import tensorflow as tf
 
-def compute_derivatives(model, x):
+def derivatives(model, x):
     with tf.GradientTape(persistent=True) as tape2:
         tape2.watch(x)
         with tf.GradientTape() as tape1:
@@ -78,143 +135,13 @@ def compute_derivatives(model, x):
     return u, du_dx, d2u_dx2
 ```
 
-## Loss Computation
+## Notes
 
-### PINNs Loss
-
-```python
-class PINNsLoss(tf.keras.layers.Layer):
-    def __init__(self, n_collocation, domain, forcing_fn, bc_weight=100.0):
-        super().__init__()
-        self.n_collocation = n_collocation
-        self.domain = domain
-        self.forcing_fn = forcing_fn
-        self.bc_weight = bc_weight
-
-    def call(self, inputs):
-        model = inputs
-
-        # Sample collocation points
-        x = tf.random.uniform(
-            (self.n_collocation, 1),
-            self.domain[0],
-            self.domain[1]
-        )
-
-        # Compute PDE residual
-        with tf.GradientTape(persistent=True) as tape:
-            tape.watch(x)
-            with tf.GradientTape() as tape1:
-                tape1.watch(x)
-                u = model(x)
-            du_dx = tape1.gradient(u, x)
-        d2u_dx2 = tape.gradient(du_dx, x)
-
-        residual = d2u_dx2 + self.forcing_fn(x)
-
-        # Boundary conditions
-        x_bc = tf.constant([[self.domain[0]], [self.domain[1]]])
-        u_bc = model(x_bc)
-
-        loss = tf.reduce_mean(residual**2) + self.bc_weight * tf.reduce_mean(u_bc**2)
-        return loss
-```
-
-### DFR Loss
-
-```python
-class DFRLoss(tf.keras.layers.Layer):
-    def __init__(self, n_quadrature, n_modes, domain):
-        super().__init__()
-        self.n_quadrature = n_quadrature
-        self.n_modes = n_modes
-        self.domain = domain
-
-        # Precompute DST matrix
-        self.dst_matrix = self._compute_dst_matrix()
-
-    def _compute_dst_matrix(self):
-        # DST-I matrix for weak residual transform
-        L = self.domain[1] - self.domain[0]
-        x = tf.linspace(self.domain[0], self.domain[1], self.n_quadrature)
-        k = tf.range(1, self.n_modes + 1, dtype=tf.float64)
-        return tf.sin(tf.tensordot(x, k * np.pi / L, axes=0))
-
-    def call(self, inputs):
-        model, forcing_fn = inputs
-
-        # Quadrature points
-        x = tf.linspace(self.domain[0], self.domain[1], self.n_quadrature)
-        x = tf.reshape(x, (-1, 1))
-
-        # Compute derivatives
-        with tf.GradientTape() as tape:
-            tape.watch(x)
-            u = model(x)
-        du_dx = tape.gradient(u, x)
-
-        # Weak residual components
-        f = forcing_fn(x)
-
-        # Transform to Fourier space and apply H^-1 weighting
-        # ... (implementation details)
-
-        return h_minus_1_norm_squared
-```
-
-## Training
-
-```python
-# Compile and train
-model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3))
-
-history = model.fit(
-    x=tf.constant([[1.0]]),  # Dummy input
-    y=tf.constant([[1.0]]),  # Dummy target
-    epochs=1000,
-    verbose=1
-)
-```
-
-## Custom Training Loop
-
-For more control:
-
-```python
-optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-
-@tf.function
-def train_step(model, loss_layer):
-    with tf.GradientTape() as tape:
-        loss = loss_layer(model)
-    gradients = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-    return loss
-
-# Training loop
-for epoch in range(1000):
-    loss = train_step(model, loss_layer)
-    if epoch % 100 == 0:
-        print(f"Epoch {epoch}: Loss = {loss.numpy():.6f}")
-```
-
-## GPU Configuration
-
-```python
-# List available GPUs
-gpus = tf.config.list_physical_devices('GPU')
-print(f"Available GPUs: {gpus}")
-
-# Enable memory growth
-for gpu in gpus:
-    tf.config.experimental.set_memory_growth(gpu, True)
-
-# Limit GPU memory
-tf.config.set_logical_device_configuration(
-    gpus[0],
-    [tf.config.LogicalDeviceConfiguration(memory_limit=4096)]
-)
-```
+- **Precision.** Models default to `dtype="float64"`; the backend applies it with
+  `keras.backend.set_floatx(dtype)` when the network is built.
+- **Keras.** The backend is built on Keras 3; the `KERAS_BACKEND` environment
+  variable defaults to `tensorflow`.
+- **Device.** The current model API does not expose a device argument.
 
 ## See Also
 
