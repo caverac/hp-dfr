@@ -407,7 +407,7 @@ Figure~\ref{fig:dfr-vs-go-2d} reports the outcome, and Table~\ref{tab:2d} gives 
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.8\textwidth]{dfr-vs-go-2d}
+\includegraphics[width=\textwidth]{dfr-vs-go-2d}
 \caption{QoI error versus primal network degrees of freedom (DOF) on the 2D Poisson problem with a sharp bump. In contrast to 1D, the 2D problem is resolution-limited: the network's global capacity is insufficient to drive the residual to zero everywhere. Under these conditions, the decoupled goal-oriented DFR method (GO-DFR)—which uses a stop-gradient on the adjoint network to prevent optimization corruption and uses the true coupled eigenvalues $\lambda_k = \sum_i (\pi k_i / L_i)^2$—successfully redirects the network's capacity to the local support of the QoI. This yields a consistent 3x to 5x reduction in QoI error over plain DFR at matched DOFs, confirming the second-order accuracy predicted by the dual-weighted residual theory. Markers show medians over random seeds; bands span the seed min--max.}
 \label{fig:dfr-vs-go-2d}
 \end{figure}
