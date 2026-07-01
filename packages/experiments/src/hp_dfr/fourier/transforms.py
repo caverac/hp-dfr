@@ -297,15 +297,21 @@ def h_minus_1_weights(
     n_modes: Union[int, Tuple[int, ...]],
     domain: Union[Tuple[float, float], Tuple[Tuple[float, float], ...]],
 ) -> NDArray[np.floating]:
-    """Compute H^{-1} norm weights for full tensor Fourier modes.
+    r"""Compute H^{-1} norm weights for full tensor Fourier modes.
 
-    The H^{-1} norm is:
-        ||f||_{H^{-1}}^2 = sum_k |f_k|^2 * w_k^2
+    The H^{-1} norm uses the eigenvalues of the Dirichlet Laplacian. For a
+    multi-index k = (k_1, ..., k_d) on the box (0, L_1) x ... x (0, L_d), the
+    sine eigenfunction has eigenvalue
 
-    where w_k = (pi^2 * |k|^2 / L^2)^{-1/2} = L / (pi * |k|)
+        lambda_k = sum_i (pi * k_i / L_i)^2,
 
-    For multi-dimensional case with k = (k1, ..., kd):
-        w_k = prod_i (L_i / (pi * k_i))
+    and the dual (H^{-1}) weight is the Riesz factor
+
+        w_k = lambda_k^{-1/2} = ( sum_i (pi * k_i / L_i)^2 )^{-1/2},
+
+    so that ||f||_{H^{-1}}^2 = sum_k |f_k|^2 * w_k^2. In 1D this reduces to
+    w_k = L / (pi * k). Note this is *not* the separable product of 1D weights:
+    in d >= 2 the weight couples the axes through the sum of squared frequencies.
 
     Args:
         n_modes: Number of modes (int for 1D, tuple for nD).
@@ -321,24 +327,24 @@ def h_minus_1_weights(
         k = np.arange(1, n_modes + 1)
         return cast(NDArray[np.floating], L / (np.pi * k))
 
-    # nD case
+    # nD case: w_k = ( sum_i (pi k_i / L_i)^2 )^{-1/2}.
     nd_domain = cast(Tuple[Tuple[float, float], ...], domain)
     dim = len(n_modes)
-    weights_1d = []
+    freq_sq_1d = []
 
     for d in range(dim):
         a, b = nd_domain[d]
         L = b - a
         k = np.arange(1, n_modes[d] + 1)
-        weights_1d.append(L / (np.pi * k))
+        freq_sq_1d.append((np.pi * k / L) ** 2)
 
-    # Tensor product of weights
-    grids = np.meshgrid(*weights_1d, indexing="ij")
-    weights = np.ones(n_modes)
+    # Sum the per-axis squared frequencies over the tensor grid, then invert sqrt.
+    grids = np.meshgrid(*freq_sq_1d, indexing="ij")
+    eigenvalues = np.zeros(n_modes)
     for g in grids:
-        weights *= g
+        eigenvalues = eigenvalues + g
 
-    return weights
+    return cast(NDArray[np.floating], 1.0 / np.sqrt(eigenvalues))
 
 
 def compute_h_minus_1_norm(

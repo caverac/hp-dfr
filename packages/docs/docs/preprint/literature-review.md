@@ -1,18 +1,23 @@
 ---
 sidebar_position: 2
-sidebar_label: Literature Review
+sidebar_label: Background & Positioning
 ---
 
-# Literature Review
+# Background and Positioning
 
-This document surveys recent advances in adaptive hp-refinement and goal-oriented error estimation for solving PDEs using neural networks. Last updated: December 2025.
+This document surveys the methods this project builds on and positions against:
+Deep Fourier Residual methods, neural-network adaptivity, and goal-oriented error
+estimation. It also records how the project's scope was chosen.
 
 ## Overview
 
-Our research combines three key areas:
-1. **Deep Fourier Residual (DFR) methods** - variational PINNs with $H^{-1}$ dual norm loss
-2. **Adaptive hp-refinement** - domain decomposition with local networks
+Three lines of work are relevant:
+1. **Deep Fourier Residual (DFR) methods** - variational PINNs with an $H^{-1}$ dual-norm loss
+2. **Adaptive and hp-refinement** - domain decomposition with local networks
 3. **Goal-oriented error estimation** - dual-weighted residual methods
+
+The project draws on the first and third; the second is surveyed for context and for
+the scoping discussion [below](#how-this-project-is-scoped).
 
 ```mermaid
 flowchart TD
@@ -42,8 +47,8 @@ flowchart TD
     DWR --> MGDWR
     DWR --> E2N
 
-    ADFR --> OurWork["hp-DFR (Our Research)"]
-    ABPINN --> OurWork
+    ADFR --> OurWork["Goal-Oriented DFR (this project)"]
+    DWR --> OurWork
     MGDWR --> OurWork
 ```
 
@@ -266,7 +271,7 @@ Combines tensor structures with a posteriori error estimators for high-dimension
 
 ### 5.3 Sparse Grid Methods (Classical)
 
-The foundational work on sparse grids provides the mathematical basis for our sparse Fourier approach.
+The foundational work on sparse grids provides the mathematical basis for sparse Fourier approaches to the curse of dimensionality (one of the directions this project set aside).
 
 **Key Reference**: Bungartz, H.J., Griebel, M. (2004). Sparse grids. Acta Numerica, 13, 147-269.
 
@@ -317,11 +322,10 @@ SA-PINN: Local sensitivity analysis via loss function regularization.
 
 ---
 
-## 8. Research gap addressed (post-scoping)
+## How this project is scoped
 
-A viability review (June 2026; see
-`notebooks/notes/logs/20260629-idea-reframing.md`) narrowed this project to a
-single gap. The two discarded directions and the reason:
+A review (June 2026; see `notebooks/notes/logs/20260629-idea-reframing.md`) narrowed
+this project from three proposed extensions to one. The two set aside, and why:
 
 - **Sparse / hyperbolic-cross DFR** is signposted as future work by the DFR
   authors, the $O(N (\log N)^{d-1})$ speedup is unsound for a non-separable

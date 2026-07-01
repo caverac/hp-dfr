@@ -140,7 +140,7 @@ While PINNs scales better than FEM in high dimensions, it still has limitations:
 - Weak loss-error correlation (L² loss ≠ error norm)
 - Requires H² regularity
 
-The [DFR method](/docs/theory/dfr) provides better error-loss equivalence but introduces its own curse of dimensionality ($O(N^d)$ Fourier modes). Our [adaptive hp-DFR](/docs/preprint) addresses this with sparse tensor methods.
+The [DFR method](/docs/theory/dfr) provides better error-loss equivalence, at the cost of a full tensor product of $O(N^d)$ Fourier modes on box domains. This project extends DFR toward [goal-oriented error control](/docs/preprint) rather than toward higher dimensions.
 :::
 
 ## Limitations

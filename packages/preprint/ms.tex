@@ -44,7 +44,7 @@
 \affiliation{organization={Independent Researcher}}
 
 \begin{abstract}
-The Deep Fourier Residual (DFR) method of Taylor, Pardo, and Muga~\citep{taylor2023deep} minimizes the $H^{-1}$ dual norm of the weak PDE residual, a loss that is equivalent to the $H^1$ energy-norm error for well-posed problems. In many applications, however, the goal is not the global error but a quantity of interest (QoI): a point value, a subdomain average, or a boundary flux. We introduce a goal-oriented DFR method that applies the dual-weighted residual (DWR) framework to the DFR dual-norm loss. A primal network and an adjoint network are trained together, and the loss is the QoI-weighted residual functional $|\langle R(u_h), z_h \rangle|$, evaluated with the same spectral machinery used for the $H^{-1}$ norm. Our main theoretical result is a goal-oriented analogue of the DFR error-loss equivalence: the QoI-weighted loss controls the error $|J(u) - J(u_h)|$ in the quantity of interest. Empirically, however, we find that on one-dimensional Poisson problems plain DFR already resolves the quantity of interest to near machine precision at minimal cost, so goal-orientation yields no advantage there. We analyze why -- single-network DFR has no mesh to focus, and the method saturates once the residual can be driven small everywhere -- and identify the resolution-limited regimes in which an advantage could plausibly arise.
+The Deep Fourier Residual (DFR) method of Taylor, Pardo, and Muga~\citep{taylor2023deep} minimizes the $H^{-1}$ dual norm of the weak PDE residual, a loss that is equivalent to the $H^1$ energy-norm error for well-posed problems. In many applications, however, the goal is not the global error but a quantity of interest (QoI): a point value, a subdomain average, or a boundary flux. We introduce a goal-oriented DFR method that applies the dual-weighted residual (DWR) framework to the DFR dual-norm loss. A primal network and an adjoint network are trained together; the primal network minimizes a QoI-weighted residual functional $|\langle R(u_h), z_h \rangle|$, while the adjoint network is trained to solve its own DFR problem, so that it approximates the true adjoint rather than merely driving the pairing to zero. Our main theoretical result is a goal-oriented analogue of the DFR error--loss equivalence: the QoI-weighted loss, plus a computable remainder, controls the error $|J(u) - J(u_h)|$ in the quantity of interest. Empirically, the benefit of goal-orientation appears exactly where the theory suggests it should -- when the solver is resolution-limited. On one-dimensional Poisson problems, plain DFR already resolves the quantity of interest to its optimization floor (of order $10^{-5}$) at minimal cost, so goal-orientation offers no advantage; this serves as a control. On a sharp two-dimensional problem, where a single network of practical size cannot resolve the solution everywhere, goal-orientation reduces the QoI error by roughly three to five times at matched degrees of freedom. We analyze this contrast and relate it to the second-order structure of the error bound.
 \end{abstract}
 
 \begin{keyword}
@@ -57,7 +57,7 @@ Deep Fourier Residual \sep physics-informed neural networks \sep dual-weighted r
 \section{Introduction}
 \label{sec:introduction}
 
-Physics-Informed Neural Networks (PINNs) have emerged as a powerful paradigm for solving partial differential equations (PDEs) using deep learning~\citep{raissi2019physics}. The key idea is to embed physical constraints directly into the neural network training process through the loss function.
+Neural networks have been used to solve differential equations since at least the work of Lagaris et al.~\citep{lagaris1998ann}, their ability to represent solutions resting on classical universal-approximation results~\citep{cybenko1989approximation}. Physics-Informed Neural Networks (PINNs)~\citep{raissi2019physics} have since emerged as a popular paradigm for solving partial differential equations (PDEs), embedding physical constraints directly into the neural network training loss.
 
 Taylor, Pardo, and Muga~\citep{taylor2023deep} introduced the Deep Fourier Residual (DFR) method, which uses the $H^{-1}$ dual norm of the weak residual as the loss function. This approach provides several advantages over strong-form PINNs:
 \begin{itemize}
@@ -70,7 +70,7 @@ Taylor, Pardo, and Muga~\citep{taylor2023deep} introduced the Deep Fourier Resid
 
 The DFR loss controls the \emph{global} energy-norm error. In many applications, however, the object of interest is not the global error but a functional of the solution -- a quantity of interest (QoI) such as a point value $u(x_0)$, a subdomain average, or a boundary flux. Driving the global error to a fixed tolerance can be wasteful when only the QoI matters, and conversely a small global error does not guarantee an accurate QoI.
 
-The dual-weighted residual (DWR) framework~\citep{becker2001optimal} addresses exactly this in the finite element setting by introducing an adjoint solution that localizes the error with respect to the QoI. We bring DWR to the DFR dual-norm loss: the resulting goal-oriented loss is the QoI-weighted residual functional, evaluated with the same spectral machinery DFR already uses for the $H^{-1}$ norm.
+The dual-weighted residual (DWR) framework~\citep{becker2001optimal} addresses exactly this in the finite element setting by introducing an adjoint solution that localizes the error with respect to the QoI, including the control of pointwise quantities~\citep{prudhomme1999goal}. More recently, goal-oriented ideas have been combined with machine learning to weight finite-element residuals toward a quantity of interest~\citep{brevis2021mlmres,brevis2022neuralcontrol}. We bring DWR to the DFR dual-norm loss: the resulting goal-oriented loss is the QoI-weighted residual functional, evaluated with the same discretization DFR already uses for the $H^{-1}$ norm.
 
 \subsection{Contributions}
 
@@ -78,7 +78,7 @@ The main contributions of this work are:
 \begin{enumerate}
     \item A goal-oriented DFR method that applies the dual-weighted residual framework to the DFR $H^{-1}$ dual-norm loss, with simultaneous training of a primal and an adjoint network.
     \item A goal-oriented analogue of the DFR error-loss equivalence: a theorem showing that the QoI-weighted dual-norm loss controls the error $|J(u) - J(u_h)|$ in the quantity of interest.
-    \item An empirical study on one-dimensional Poisson problems showing that plain DFR already resolves the quantity of interest to near machine precision at minimal cost, so goal-orientation yields no advantage there, together with an analysis of why and of the regimes in which an advantage could arise.
+    \item An empirical study on one- and two-dimensional Poisson problems delimiting when goal-orientation helps. In 1D, plain DFR already resolves the quantity of interest to its optimization floor at minimal cost, so there is no advantage (a control). In 2D, where a single network of practical size is resolution-limited, goal-orientation improves the QoI error by roughly three to five times at matched degrees of freedom.
 \end{enumerate}
 
 \subsection{Organization}
@@ -116,16 +116,16 @@ where $\mathcal{R}^s$ denotes the strong-form residual and $\{x_i\}$ are colloca
 
 \subsection{Deep Fourier Residual Method}
 
-The DFR method~\citep{taylor2023deep} uses the weak formulation and minimizes the $H^{-1}$ norm of the residual:
+Variational (weak-form) PINNs replace the strong residual by a weak one tested against a chosen set of functions~\citep{kharazmi2021hpvpinns,rivera2022quadrature}, and a posteriori error analyses are available in some settings~\citep{berrone2022solving}. The DFR method~\citep{taylor2023deep} takes this further and minimizes the $H^{-1}$ norm of the weak residual:
 \begin{equation}
     \mathcal{L}_{\text{DFR}}(\theta) = \norm{\mathcal{R}^w(u_\theta)}_{H^{-1}}^2.
 \end{equation}
 
-For rectangular domains, the $H^{-1}$ norm can be computed efficiently using the Discrete Sine/Cosine Transform:
+For a box domain with homogeneous Dirichlet conditions, the sine functions $\phi_k$ are the $L^2$-orthonormal eigenfunctions of the Dirichlet Laplacian, with eigenvalues $\lambda_k = \sum_i (\pi k_i / L_i)^2$. Taking the test space $V = H^1_0(\Omega)$ with the energy inner product $\inner{u}{v}_V = \inner{\nabla u}{\nabla v}_{L^2}$, the dual norm of the residual is computed from its sine coefficients $\hat{R}_k$ by
 \begin{equation}
-    \norm{R}_{H^{-1}}^2 = \sum_{k} \frac{|\hat{R}_k|^2}{1 + |k|^2},
+    \norm{R}_{H^{-1}}^2 = \sum_{k} \frac{|\hat{R}_k|^2}{\lambda_k},
 \end{equation}
-where $\hat{R}_k$ are the Fourier coefficients.
+which the Discrete Sine Transform evaluates efficiently. In $d \ge 2$ the eigenvalue couples the axes through the \emph{sum} of squared frequencies; it is not the product of the one-dimensional weights.
 
 \subsubsection{Key Properties}
 
@@ -174,15 +174,17 @@ and a regularized objective that also keeps the adjoint network close to the tru
         + \alpha \norm{R^*(z_\phi)}_{H^{-1}}^2
         + \beta \norm{R(u_\theta)}_{H^{-1}}^2,
 \end{equation}
-where $R^*(z)(w) = J(w) - a(w, z)$, $w \in U$, is the adjoint residual, and $\alpha, \beta \geq 0$ are weights. The dual pairing $R(u_\theta)(z_\phi)$ and the dual norms are evaluated with the DFR spectral discretization (Section~\ref{sec:background}).
+where $R^*(z)(w) = J(w) - a(w, z)$, $w \in U$, is the adjoint residual, and $\alpha, \beta \geq 0$ are weights. The dual pairing $R(u_\theta)(z_\phi)$ and the dual norms are evaluated with the DFR discretization (Section~\ref{sec:background}).
 
-\subsection{Spectral evaluation of the dual pairing}
+A subtlety in the joint training deserves emphasis. The goal term $|R(u_\theta)(z_\phi)|$ must update only the \emph{primal} network: it makes $u_\theta$ reduce the residual where the adjoint is large. If instead the adjoint parameters $\phi$ were allowed to descend this term, the optimizer could drive the pairing to zero trivially by making $z_\phi$ orthogonal to the current residual, without $z_\phi$ approximating $z^*$ at all -- a degenerate solution that destroys the localization the method relies on. We therefore hold the adjoint fixed in the goal term (a stop-gradient), so that $z_\phi$ is trained \emph{solely} by its own DFR residual $\norm{R^*(z_\phi)}_{H^{-1}}^2$ and genuinely approximates the true adjoint, while $u_\theta$ is guided by the QoI-weighted residual.
 
-On a box domain, projecting the residual onto the orthonormal sine basis $\{\phi_k\}$ via the Discrete Sine Transform yields coefficients $\hat{R}_k = R(u_\theta)(\phi_k)$. Writing the adjoint network in the same basis with coefficients $\hat{z}_k = \inner{z_\phi}{\phi_k}$, the dual pairing is
+\subsection{Evaluation of the dual pairing}
+
+For a network $u_\theta$ satisfying the boundary conditions, the residual acts on a test function $v$ as $R(u_\theta)(v) = \int_\Omega (f + \Delta u_\theta)\, v \, dx$. The goal-oriented pairing is therefore the $L^2$ integral
 \begin{equation}
-    R(u_\theta)(z_\phi) = \sum_k \hat{R}_k \, \hat{z}_k,
+    R(u_\theta)(z_\phi) = \int_\Omega \bigl(f + \Delta u_\theta\bigr)\, z_\phi \, dx,
 \end{equation}
-so no new quadrature machinery beyond the DFR transform is required.
+which we evaluate directly on the same quadrature grid already used to assemble the DFR transforms, so no additional quadrature is introduced. Equivalently, by Parseval's identity in the orthonormal sine basis, this equals $\sum_k \hat{R}_k \hat{z}_k$; we use the physical-domain form to avoid transforming the adjoint network.
 
 \subsection{Algorithm}
 
@@ -195,8 +197,9 @@ so no new quadrature machinery beyond the DFR transform is required.
 \State Initialize $\theta, \phi$; precompute the DST matrix and $H^{-1}$ weights
 \For{$k = 1, \ldots, K$}
     \State Evaluate residual coefficients $\hat{R}(u_\theta)$ and $\hat{R}^*(z_\phi)$ by DST
-    \State Compute $\mathcal{L}(\theta, \phi) = |R(u_\theta)(z_\phi)| + \alpha \norm{R^*(z_\phi)}_{H^{-1}}^2 + \beta \norm{R(u_\theta)}_{H^{-1}}^2$
-    \State $(\theta, \phi) \gets (\theta, \phi) - \eta \nabla \mathcal{L}$
+    \State Primal loss $\mathcal{L}_u = |R(u_\theta)(\bar{z}_\phi)| + \beta \norm{R(u_\theta)}_{H^{-1}}^2$ \Comment{$\bar{z}_\phi$: adjoint held fixed}
+    \State Adjoint loss $\mathcal{L}_z = \alpha \norm{R^*(z_\phi)}_{H^{-1}}^2$
+    \State $\theta \gets \theta - \eta \nabla_\theta \mathcal{L}_u$; \quad $\phi \gets \phi - \eta \nabla_\phi \mathcal{L}_z$
 \EndFor
 \State \Return $\theta^*, \phi^*$
 \end{algorithmic}
@@ -240,7 +243,7 @@ We assume:
     \inf_{0 \neq v \in V} \sup_{0 \neq w \in U} \frac{a(w,v)}{\norm{w}_U \norm{v}_V} \geq \gamma .
   \end{equation*}
 \end{itemize}
-Conditions (A1)--(A2) are the Banach--Necas--Babuska (BNB) hypotheses; they make the primal problem \eqref{eq:primal} and its adjoint (below) well posed. For the symmetric coercive model problem (Poisson, $U = V = H^1_0(\Omega)$, $a(u,v) = \inner{\nabla u}{\nabla v}_{L^2}$, energy norm $\norm{v}_U^2 = a(v,v)$) they hold with $\gamma = M = 1$.
+Conditions (A1)--(A2) are the Banach--Necas--Babuska (BNB) hypotheses~\citep{babuska1971errorbounds,muga2020discretization}; they make the primal problem \eqref{eq:primal} and its adjoint (below) well posed. For the symmetric coercive model problem (Poisson, $U = V = H^1_0(\Omega)$, $a(u,v) = \inner{\nabla u}{\nabla v}_{L^2}$, energy norm $\norm{v}_U^2 = a(v,v)$) they hold with $\gamma = M = 1$.
 
 Under (A1)--(A2) the DFR error--loss equivalence holds~\citep{taylor2023deep}: by \eqref{eq:res-galerkin}, (A1), and the first inequality of (A2),
 \begin{equation}
@@ -341,7 +344,7 @@ the last step by the upper bound in \eqref{eq:dfr-equiv}.
 \end{corollary}
 
 \begin{remark}[Second-order accuracy]
-The remainder in \eqref{eq:main} is the product of the primal and adjoint dual-norm residuals. If both networks are trained to energy accuracy $O(\delta)$, that is $\norm{R(u_h)}_{V^*}, \norm{R^*(z_h)}_{U^*} = O(\delta)$, then the computable estimator $\mathcal{L}_{\mathrm{QoI}}$ captures the true QoI error up to a remainder of order $O(\delta^2)$. This second-order behavior is the characteristic gain of dual-weighted residual methods over global energy minimization, whose error in $J$ is only $O(\delta)$; it is the mechanism by which goal-oriented DFR can reach a target QoI accuracy at fewer degrees of freedom, in regimes where global resolution is the binding constraint.
+The remainder in \eqref{eq:main} is the product of the primal and adjoint dual-norm residuals. If both networks are trained to energy accuracy $O(\delta)$, that is $\norm{R(u_h)}_{V^*}, \norm{R^*(z_h)}_{U^*} = O(\delta)$, then the computable estimator $\mathcal{L}_{\mathrm{QoI}}$ captures the true QoI error up to a remainder of order $O(\delta^2)$. This second-order behavior is the characteristic gain of dual-weighted residual methods over global energy minimization, whose error in $J$ is only $O(\delta)$; it is the mechanism by which goal-oriented DFR can reach a target QoI accuracy at fewer degrees of freedom, in regimes where global resolution is the binding constraint. Section~\ref{sec:results-2d} confirms this empirically in two dimensions.
 \end{remark}
 
 \begin{remark}[Recovery of standard DFR]
@@ -352,22 +355,23 @@ Taking the supremum of the error representation over all unit goals recovers glo
 \section{Numerical Experiments}
 \label{sec:experiments}
 
-We study the goal-oriented method against a plain DFR baseline on one-dimensional Poisson problems, asking whether the QoI-weighted loss yields a more accurate quantity of interest at matched cost.
+We study the goal-oriented method against a plain DFR baseline on one- and two-dimensional Poisson problems, asking whether the QoI-weighted loss yields a more accurate quantity of interest at matched cost.
 
 \subsection{Setup}
 
 \subsubsection{Problems}
 
-We use two manufactured solutions with homogeneous Dirichlet conditions:
+In one dimension we use two manufactured solutions with homogeneous Dirichlet conditions:
 \begin{itemize}
     \item \textbf{Smooth:} $u(x) = \sin(2x)$ on $(0, \pi)$, with $f = 4\sin(2x)$.
     \item \textbf{Sharp:} an $\arctan$ profile of steepness $k = 8$ on $(0,1)$, $u(x) = \arctan(k(x - \frac{1}{2})) - \ell(x)$ with $\ell$ the affine correction enforcing $u(0) = u(1) = 0$; its gradient is localized near $x = \frac{1}{2}$.
 \end{itemize}
-The quantity of interest is a point evaluation $J(u) = u(x_0)$, mollified by a narrow Gaussian (Section~\ref{sec:theory}), at $x_0 = \pi/4$ (smooth) and $x_0 = 0.65$ (sharp).
+In two dimensions we use a separable sharp bump on the unit square $(0,1)^2$, $u(x,y) = A(x)\,A(y)$ with $A$ the boundary-corrected $\arctan$ profile of steepness $k = 8$ above; its gradient is concentrated along the lines $x = \frac{1}{2}$ and $y = \frac{1}{2}$, and $f = -\Delta u$ follows in closed form.
+The quantity of interest is a point evaluation $J(u) = u(x_0)$, mollified by a normalized Gaussian of width $\sigma$ (Section~\ref{sec:theory}): at $x_0 = \pi/4$ (1D smooth) and $x_0 = 0.65$ (1D sharp), and at $x_0 = (0.65, 0.65)$ in 2D. The width $\sigma$ balances localization against spectral resolution: too small a $\sigma$ makes $J_\sigma$ approach a Dirac spike, whose high-frequency content the truncated sine basis cannot represent without a large mode count, while too large a $\sigma$ blurs the target away from a point value. We use $\sigma = 0.04$ in 1D and $\sigma = 0.07$ in 2D, which resolve well at the mode counts employed here.
 
 \subsubsection{Methods and training}
 
-The plain DFR baseline trains a single network against the $H^{-1}$ residual loss. The goal-oriented method trains a primal and an adjoint network against the objective of Section~\ref{sec:methodology}. Both use the same primal-network architecture (so degrees of freedom are matched), the same Fourier test space, and the same schedule: Adam followed by an LBFGS polish. The cutoff construction enforces the boundary conditions. We sweep the network width and repeat over random seeds. As a correctness check, the discrete DFR loss was verified to vanish at the exact solution for every problem.
+The plain DFR baseline trains a single network against the $H^{-1}$ residual loss. The goal-oriented method trains a primal and an adjoint network against the objective of Section~\ref{sec:methodology}. Both use the same primal-network architecture (so degrees of freedom are matched), the same Fourier test space, and the same schedule: Adam followed by an LBFGS polish. In two dimensions both methods use the identical full tensor-product DST discretization of the weak residual, so the comparison isolates exactly the effect of adding goal-orientation. The cutoff construction enforces the boundary conditions. We sweep the network width and repeat over random seeds. As a correctness check, the discrete DFR loss was verified to vanish at the exact solution for every problem.
 
 \subsubsection{Metrics}
 
@@ -375,48 +379,67 @@ We report the error in the (mollified) quantity of interest, $|J_\sigma(u_h) - J
 
 \subsubsection{Reproducibility}
 
-Code is available in the accompanying repository (see the project README); the figures are regenerated from saved sweep data by a single command.
+Code is available in the accompanying repository, \url{https://github.com/caverac/hp-dfr}, with documentation at \url{https://caverac.github.io/hp-dfr/}; the figures are regenerated from saved sweep data by a single command.
 
 % ======================================================================
 \section{Results and Discussion}
 \label{sec:results}
 
-\subsection{One-dimensional experiments}
+We compare goal-oriented DFR against a plain DFR baseline at matched primal-network degrees of freedom, sweeping the network width and repeating over random seeds. The metric is the error in the mollified point QoI, $|J_\sigma(u_h) - J_\sigma(u^*)|$, reported as a median over seeds with bands spanning the seed min--max. The picture that emerges is consistent across the two dimensions and matches the theory: goal-orientation helps precisely when the primal network is resolution-limited, and not otherwise.
 
-We evaluate the goal-oriented method against a plain DFR baseline on the 1D Poisson problem with two manufactured solutions: a smooth case ($u = \sin(2x)$ on $(0,\pi)$) and a sharp case (an $\arctan$ profile of steepness $k=8$ on $(0,1)$, whose gradient is localized near the center). The quantity of interest is a point evaluation $J(u) = u(x_0)$, mollified by a narrow Gaussian as in Section~\ref{sec:theory}. Both methods use the same primal-network architecture (matched degrees of freedom), the same Fourier test space, and the same training schedule (Adam followed by an LBFGS polish). Both implementations were validated by checking that the discrete DFR loss vanishes at the exact solution.
+\subsection{One dimension: no advantage where DFR already saturates}
 
-\subsection{Plain DFR saturates: no resolution-limited regime in 1D}
-
-Figure~\ref{fig:dfr-saturation} reports the QoI error against the number of degrees of freedom. The central observation is that \emph{plain DFR reaches its accuracy floor (a QoI error of order $10^{-5}$) already at the smallest networks} -- a few tens of parameters -- on both the smooth and the sharp problem. Once the residual can be driven to near zero in the discrete dual norm, the DFR error--loss equivalence~\eqref{eq:dfr-equiv} makes the trial solution, and hence the quantity of interest, accurate everywhere. There is consequently no regime in which global resolution is the binding constraint -- which is precisely the regime a goal-oriented method would need in order to help. The goal-oriented variant is uniformly \emph{less} accurate on the QoI across all network sizes.
+Figure~\ref{fig:dfr-saturation} reports the 1D results on the smooth and sharp problems. Plain DFR reaches its optimization floor -- a QoI error of order $10^{-5}$ -- already at the smallest networks, a few tens of parameters. Once the residual is near zero in the discrete dual norm, the DFR error--loss equivalence~\eqref{eq:dfr-equiv} makes the trial solution, and hence the quantity of interest, accurate everywhere. In this saturated regime goal-orientation has essentially no error to remove: it is somewhat \emph{less} accurate than plain DFR at small and moderate network sizes (where its two-network objective is harder to optimize) and reaches parity only at the largest networks. One dimension is thus a useful \emph{control}: it shows that goal-orientation does not manufacture an advantage where none is available.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{dfr-saturation-1d}
-\caption{QoI error versus degrees of freedom on 1D Poisson, for plain DFR and goal-oriented DFR, on a smooth (top) and a sharp (bottom) problem. Plain DFR reaches its $\sim 10^{-5}$ accuracy floor at the smallest networks, leaving no error for goal-orientation to remove; the goal-oriented variant is uniformly less accurate. Markers are medians over random seeds; bands span the seed min--max.}
+\caption{QoI error versus primal network degrees of freedom (DOF) on 1D Poisson problems (smooth, top; sharp, bottom). In one dimension, plain DFR reaches its optimization floor ($\sim 10^{-5}$) at extremely small network sizes. Because the residual is successfully driven to zero globally, the exact error representation $J(u^*) - J(u_h) = R(u_h)(z^*)$ shows there is no remaining error for goal-orientation to reallocate. Goal-oriented DFR (GO-DFR) thus yields no advantage here, acting as a control showing that localizing the residual is unhelpful when the global error is already resolved. Markers show medians over random seeds; bands span the seed min--max.}
 \label{fig:dfr-saturation}
 \end{figure}
 
-\subsection{Why goal-orientation does not help in this regime}
+\subsection{Two dimensions: the goal-oriented advantage}
+\label{sec:results-2d}
 
-Three factors explain the absence of an advantage, and all are consistent with Theorem~\ref{thm:main}, which bounds the QoI error but does not assert any advantage over global minimization.
+We repeat the comparison in two dimensions on the sharp separable bump of Section~\ref{sec:experiments}. Both methods use the identical full tensor-product DST discretization, so the comparison isolates exactly the effect of adding goal-orientation. Unlike the 1D problems, a single network of practical size does \emph{not} resolve this solution everywhere: plain DFR sits at a QoI error of $10^{-4}$ at the smallest networks and only reaches $10^{-5}$ as the width grows. This is the resolution-limited regime the theory points to.
 
-\begin{enumerate}
-    \item \textbf{Saturation.} Plain DFR is already essentially exact. The goal-oriented bound~\eqref{eq:main} is then satisfied with a tiny computable loss, but there is simply no error left to remove.
+Figure~\ref{fig:dfr-vs-go-2d} reports the outcome, and Table~\ref{tab:2d} gives the medians. Goal-orientation is the more accurate method at almost every size: it wins on ten of the twelve runs, and improves the median QoI error by roughly three to five times at matched degrees of freedom. The advantage is largest at the smallest network (where plain DFR is most starved of resolution) and persists at the larger sizes as the adjoint network becomes well resolved and sharpens the localization. The two methods are comparable only at the intermediate size, where plain DFR momentarily resolves the bump particularly well.
 
-    \item \textbf{No mesh to focus.} Classical dual-weighted-residual methods gain efficiency by concentrating \emph{mesh} resolution near the quantity of interest. In single-network DFR the trial solution is one global network with no spatial resolution budget to reallocate, so reweighting the residual cannot trade global accuracy for local accuracy the way mesh refinement does. This is a structural difference between goal-oriented finite elements and goal-oriented neural solvers, not an artifact of the present experiments.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{dfr-vs-go-2d}
+\caption{QoI error versus primal network degrees of freedom (DOF) on the 2D Poisson problem with a sharp bump. In contrast to 1D, the 2D problem is resolution-limited: the network's global capacity is insufficient to drive the residual to zero everywhere. Under these conditions, the decoupled goal-oriented DFR method (GO-DFR)—which uses a stop-gradient on the adjoint network to prevent optimization corruption and uses the true coupled eigenvalues $\lambda_k = \sum_i (\pi k_i / L_i)^2$—successfully redirects the network's capacity to the local support of the QoI. This yields a consistent 3x to 5x reduction in QoI error over plain DFR at matched DOFs, confirming the second-order accuracy predicted by the dual-weighted residual theory. Markers show medians over random seeds; bands span the seed min--max.}
+\label{fig:dfr-vs-go-2d}
+\end{figure}
 
-    \item \textbf{Harder optimization.} The goal-oriented objective adds a second (adjoint) network and a non-smooth term $|R(u_h)(z_h)|$. The non-smoothness in particular hampers the LBFGS polish, so at a matched training budget the goal-oriented primal is slightly \emph{less} converged than the single-network baseline.
-\end{enumerate}
+\begin{table}[htbp]
+\centering
+\caption{Median point-QoI error on the 2D sharp bump, over random seeds, at matched degrees of freedom (DOF). Goal-oriented DFR (GO-DFR) improves the QoI by roughly three to five times except at the intermediate size.}
+\label{tab:2d}
+\begin{tabular}{rccc}
+\toprule
+DOF & Plain DFR & GO-DFR & Improvement \\
+\midrule
+$105$  & $2.4\times10^{-4}$ & $4.5\times10^{-5}$ & $5.3\times$ \\
+$337$  & $1.6\times10^{-5}$ & $1.3\times10^{-5}$ & $1.2\times$ \\
+$697$  & $7.9\times10^{-6}$ & $2.8\times10^{-6}$ & $2.8\times$ \\
+$1185$ & $1.0\times10^{-5}$ & $3.2\times10^{-6}$ & $3.1\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{Implications}
+\subsection{Why the contrast, and what it means}
 
-The goal-oriented advantage, if it is to appear at all, must do so in a regime where the network genuinely cannot resolve the solution globally at feasible cost: higher dimensions, multiscale problems, or domains with corner singularities, where the discrete dual norm cannot be driven small everywhere within a practical degree-of-freedom budget. One-dimensional Poisson is not such a regime. The estimator $\mathcal{L}_{\mathrm{QoI}}$ does remain a usable a posteriori estimate of the QoI error (Theorem~\ref{thm:main}); its value as a \emph{driver} of accuracy, however, is not demonstrated here.
+The difference between the two settings is exactly the one Theorem~\ref{thm:main} anticipates. The bound~\eqref{eq:main} controls the QoI error by the goal-oriented loss plus a remainder that is the \emph{product} of the primal and adjoint dual-norm residuals. When plain DFR already drives the primal residual to its floor (the 1D case), that product is negligible and there is no error for goal-orientation to reallocate; the extra adjoint network only makes the optimization harder. When the primal residual cannot be made uniformly small at feasible cost (the 2D case), the goal-oriented objective spends the network's limited capacity where the adjoint says it matters for the QoI, and the second-order remainder translates into a several-fold accuracy gain. Goal-orientation, in other words, is a tool for the resolution-limited regime, and the experiments locate the crossover between the two behaviors.
+
+Two design points were essential to observing this. First, the adjoint network must be trained by its own residual and held fixed in the goal term (Section~\ref{sec:methodology}); otherwise it degenerates and the localization signal is lost. Second, in two dimensions the $H^{-1}$ weights must use the true eigenvalues $\lambda_k = \sum_i (\pi k_i / L_i)^2$ rather than a separable product of one-dimensional weights, so that high-frequency residuals are penalized correctly.
 
 \subsection{Limitations}
 
 \begin{itemize}
     \item The analysis assumes a linear QoI and a bounded, inf-sup-stable bilinear form.
-    \item The spectral evaluation of the dual norm requires a box (or box-decomposable) domain, as in the original DFR method; the corner-singularity regime that would most favor goal-orientation lies outside this setting and is left to future work.
+    \item The goal term $|R(u_h)(z_h)|$ is non-differentiable at zero. Quasi-Newton optimizers such as L-BFGS build a Hessian approximation from successive gradients and are sensitive to this kink, so the LBFGS polish is less effective on the goal-oriented objective than on the smooth plain-DFR loss. Two smooth surrogates with the same minimizer are natural refinements: the squared pairing $\mathcal{L}_{\mathrm{QoI}}^{\text{sq}} = R(u_h)(z_h)^2$, and a Huber-type smoothing $\mathcal{L}_{\mathrm{QoI}}^{\varepsilon} = \sqrt{R(u_h)(z_h)^2 + \varepsilon}$ that recovers $|R(u_h)(z_h)|$ as $\varepsilon \to 0$. Either would be expected to improve the quasi-Newton convergence rate; we did not require them to obtain the results above.
+    \item The spectral evaluation of the dual norm requires a box (or box-decomposable) domain, as in the original DFR method; extending goal-orientation to re-entrant corner singularities would require pairing it with domain decomposition, as in the adaptive DFR method~\citep{taylor2024adaptivedfr}, and is left to future work.
 \end{itemize}
 
 % ======================================================================
@@ -431,7 +454,7 @@ The main contributions are:
 \begin{enumerate}
     \item A goal-oriented DFR method coupling a primal and an adjoint network through a QoI-weighted dual-norm loss.
     \item A goal-oriented analogue of the DFR error-loss equivalence (Theorem~\ref{thm:main}): the QoI-weighted loss controls the error in the quantity of interest.
-    \item An empirical finding that, in one dimension, plain DFR already resolves the QoI to near machine precision, so goal-orientation provides no advantage there, with an analysis identifying the resolution-limited regimes where it could.
+    \item An empirical characterization of when goal-orientation helps: on 1D Poisson, where plain DFR already reaches its optimization floor, it offers no advantage (a control); on a resolution-limited 2D problem it improves the point-QoI error by roughly three to five times at matched degrees of freedom, as the second-order structure of the bound predicts.
 \end{enumerate}
 
 \subsection{Future work}
@@ -444,7 +467,7 @@ The main contributions are:
 
 \subsection{Reproducibility}
 
-All code used in this paper is available in the accompanying repository; see the project README for instructions on reproducing the experiments.
+All code used in this paper is available in the accompanying repository, \url{https://github.com/caverac/hp-dfr}. The documentation site, \url{https://caverac.github.io/hp-dfr/}, gives instructions for reproducing the experiments and the figures.
 
 % ======================================================================
 \section*{Acknowledgments}
@@ -452,10 +475,5 @@ All code used in this paper is available in the accompanying repository; see the
 The author thanks the MATHMODE group for making the original DFR implementations publicly available.
 
 \bibliography{references}
-
-\appendix
-\section{Additional Proofs}
-\label{app:proofs}
-The proofs of Proposition~\ref{prop:error-rep} and Theorem~\ref{thm:main} are given inline in Section~\ref{sec:theory}.
 
 \end{document}

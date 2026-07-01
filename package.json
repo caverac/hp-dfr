@@ -2,7 +2,7 @@
   "name": "hp-dfr",
   "version": "0.1.0",
   "private": true,
-  "description": "Adaptive hp-DFR: Goal-Oriented Deep Fourier Residual Methods",
+  "description": "Goal-Oriented Deep Fourier Residual methods for solving PDEs with neural networks",
   "workspaces": [
     "packages/*"
   ],
@@ -38,6 +38,11 @@
   },
   "packageManager": "yarn@4.12.0",
   "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^7.0.3",
+    "@semantic-release/git": "^10.0.1",
     "@typescript-eslint/eslint-plugin": "^8.33.0",
     "@typescript-eslint/parser": "^8.33.0",
     "eslint": "^9.28.0",
@@ -46,6 +51,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "globals": "^16.2.0",
     "prettier": "^3.5.3",
+    "semantic-release": "^24.2.0",
     "typescript": "^5.9.3"
   }
 }

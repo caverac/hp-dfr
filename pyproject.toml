@@ -151,6 +151,16 @@ exclude = [
     "conftest\\.py$",
 ]
 
+# Optional deep-learning backends are treated as untyped regardless of whether
+# they are installed, so type-checking is identical in CI (no backends) and in a
+# developer environment that has installed one. This mirrors the pylint
+# `ignored-modules` setting; the backend glue is exercised by the test suite.
+[[tool.mypy.overrides]]
+module = ["tensorflow.*", "keras.*", "torch.*", "jax.*", "jaxlib.*", "optax.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["packages/experiments/tests"]
 pythonpath = ["."]

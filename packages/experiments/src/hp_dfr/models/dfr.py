@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple, cast
 import numpy as np
 from numpy.typing import NDArray
 
+from hp_dfr.fourier.transforms import dst_matrix_nd_full, h_minus_1_weights
 from hp_dfr.models.base import BaseModel, Problem
 from hp_dfr.utils import console
 
@@ -69,6 +70,7 @@ class DFRModel(BaseModel):
         n_quadrature: int = 100,
         n_fourier_modes: int = 10,
         backend: str = "tensorflow",
+        dim: int = 1,
     ):
         """Initialize DFR model.
 
@@ -77,14 +79,16 @@ class DFRModel(BaseModel):
             activation: Activation function for hidden layers.
             dtype: Floating point precision.
             seed: Random seed for reproducibility.
-            n_quadrature: Number of quadrature points for integration.
-            n_fourier_modes: Number of Fourier modes for H^-1 norm computation.
+            n_quadrature: Number of quadrature points (per axis) for integration.
+            n_fourier_modes: Number of Fourier modes (per axis) for H^-1 norm.
             backend: Deep learning backend ('tensorflow', 'jax', or 'pytorch').
+            dim: Spatial dimension of the problem (1 for an interval, 2 for a box).
         """
         super().__init__(hidden_layers=hidden_layers, activation=activation, dtype=dtype, seed=seed)
         self.n_quadrature = n_quadrature
         self.n_fourier_modes = n_fourier_modes
         self.backend = backend
+        self.dim = dim
         # Precomputed arrays / backend handles, set lazily in build()/fit().
         self._backend_module: object | None = None
         self._domain: Optional[Tuple[float, float]] = None
@@ -93,6 +97,10 @@ class DFRModel(BaseModel):
         self._h_minus_1_weights: Optional[ArrayF] = None
         self._quadrature_pts: Optional[ArrayF] = None
         self._raw_model: object | None = None
+        # nD (dim >= 2) path: full-tensor DST machinery shared with the
+        # goal-oriented model, set lazily in _setup_fourier_nd().
+        self._nd_domain: Optional[Tuple[Tuple[float, float], ...]] = None
+        self._nd_quad_points: Optional[ArrayF] = None
 
     def _compute_transform_matrices(self, domain: tuple) -> None:
         """Precompute DST and DCT matrices for Fourier transforms.
@@ -124,16 +132,20 @@ class DFRModel(BaseModel):
             [V * (ki * np.pi / L) * np.cos(np.pi * ki * (self._quadrature_pts - a) / L) * h for ki in range(1, self.n_fourier_modes + 1)]
         )
 
-    def build(self, input_dim: int = 1, output_dim: int = 1) -> None:
+    def build(self, input_dim: Optional[int] = None, output_dim: int = 1) -> None:
         """Build the neural network with cutoff layer.
 
         The cutoff layer enforces homogeneous Dirichlet boundary conditions
-        by multiplying the network output by (x - a)(b - x).
+        by multiplying the network output by the product of (x_d - a_d)(b_d - x_d)
+        over the spatial axes.
 
         Args:
-            input_dim: Dimension of input (spatial coordinates).
+            input_dim: Dimension of input (spatial coordinates). Defaults to the
+                model's ``dim``.
             output_dim: Dimension of output (solution components).
         """
+        if input_dim is None:
+            input_dim = self.dim
         if self.backend == "tensorflow":
             self._build_tensorflow(input_dim, output_dim)
         elif self.backend == "jax":
@@ -240,6 +252,9 @@ class DFRModel(BaseModel):
         if self._model is None:
             self.build()
 
+        if self.dim >= 2:
+            return self._fit_nd(problem, epochs, learning_rate, verbose, lbfgs_iters)
+
         # Precompute transform matrices
         self._compute_transform_matrices(problem.domain)
 
@@ -250,6 +265,22 @@ class DFRModel(BaseModel):
         if self.backend == "pytorch":
             return self._fit_pytorch(problem, epochs, learning_rate, verbose, lbfgs_iters)
         raise ValueError(f"Unknown backend: {self.backend}")
+
+    def _fit_nd(
+        self,
+        problem: Problem,
+        epochs: int,
+        learning_rate: float,
+        verbose: bool,
+        lbfgs_iters: int,
+    ) -> Dict[str, List[float]]:
+        """Dispatch the dim >= 2 DFR training to the requested backend."""
+        self._setup_fourier_nd(problem.domain)
+        if self.backend == "tensorflow":
+            return self._fit_tensorflow_nd(problem, epochs, learning_rate, verbose)
+        if self.backend == "pytorch":
+            return self._fit_pytorch_nd(problem, epochs, learning_rate, verbose, lbfgs_iters)
+        raise ValueError(f"Backend {self.backend} not implemented for dim >= 2")
 
     def _fit_tensorflow(self, problem: Problem, epochs: int, learning_rate: float, verbose: bool) -> Dict[str, List[float]]:
         """Train using TensorFlow with DFR loss."""
@@ -449,15 +480,197 @@ class DFRModel(BaseModel):
 
         return self._history
 
+    # ------------------------------------------------------------------
+    # nD (dim >= 2) DFR path. The discretization matches the goal-oriented
+    # model's primal half exactly -- full-tensor DST of the weak residual
+    # ``f + Delta u`` with an autodiff Laplacian and a product cutoff -- so the
+    # plain baseline and the goal-oriented method differ only by the goal term.
+    # ------------------------------------------------------------------
+    def _setup_fourier_nd(self, domain: Tuple[Tuple[float, float], ...]) -> None:
+        """Precompute the full-tensor DST matrix, H^-1 weights, and quadrature."""
+        self._nd_domain = domain
+        grid_shape = tuple([self.n_quadrature] * self.dim)
+        self._dst_matrix = dst_matrix_nd_full(grid_shape, domain, self.n_fourier_modes)
+        self._h_minus_1_weights = h_minus_1_weights(tuple([self.n_fourier_modes] * self.dim), domain).ravel()
+
+        quad_1d = []
+        for d in range(self.dim):
+            a, b = domain[d]
+            x = np.linspace(a, b, self.n_quadrature + 1)
+            dx = x[1] - x[0]
+            quad_1d.append(x[:-1] + dx / 2)
+        grids = np.meshgrid(*quad_1d, indexing="ij")
+        self._nd_quad_points = np.stack([g.ravel() for g in grids], axis=1)
+
+    def _cutoff_torch(self, x: "torch.Tensor", domain: Tuple[Tuple[float, float], ...], dtype: "torch.dtype") -> "torch.Tensor":
+        """Product cutoff enforcing homogeneous Dirichlet conditions (PyTorch)."""
+        result = torch.ones((x.shape[0], 1), dtype=dtype)
+        for d in range(self.dim):
+            lo, hi = domain[d]
+            result = result * (x[:, d : d + 1] - lo) * (hi - x[:, d : d + 1])
+        return result
+
+    def _laplacian_torch(
+        self,
+        x: "torch.Tensor",
+        model: "torch.nn.Module",
+        domain: Tuple[Tuple[float, float], ...],
+        dtype: "torch.dtype",
+    ) -> "torch.Tensor":
+        """Laplacian of the cutoff-enforced network via autodiff (PyTorch)."""
+        cutoff = self._cutoff_torch(x, domain, dtype)
+        u = cutoff * model(x)
+        laplacian = torch.zeros(x.shape[0], dtype=dtype)
+        for d in range(self.dim):
+            du_d = torch.autograd.grad(u.sum(), x, create_graph=True, retain_graph=True)[0][:, d]
+            d2u_d = torch.autograd.grad(du_d.sum(), x, create_graph=True, retain_graph=True)[0][:, d]
+            laplacian = laplacian + d2u_d
+        return laplacian
+
+    def _cutoff_tf(self, x: "tf.Tensor", domain: Tuple[Tuple[float, float], ...]) -> "tf.Tensor":
+        """Product cutoff enforcing homogeneous Dirichlet conditions (TensorFlow)."""
+        result = tf.ones((tf.shape(x)[0], 1), dtype=self.dtype)
+        for d in range(self.dim):
+            lo, hi = domain[d]
+            result = result * (x[:, d : d + 1] - lo) * (hi - x[:, d : d + 1])
+        return result
+
+    def _laplacian_tf(self, x: "tf.Tensor", model: "keras.Model", domain: Tuple[Tuple[float, float], ...]) -> "tf.Tensor":
+        """Laplacian of the cutoff-enforced network via autodiff (TensorFlow)."""
+        laplacian = tf.zeros((tf.shape(x)[0],), dtype=self.dtype)
+        for d in range(self.dim):
+            with tf.GradientTape() as t2:
+                t2.watch(x)
+                with tf.GradientTape() as t1:
+                    t1.watch(x)
+                    cutoff = self._cutoff_tf(x, domain)
+                    u = cutoff * model(x, training=True)
+                du = t1.gradient(u, x)
+            d2u = t2.gradient(du[:, d], x)
+            if d2u is not None:
+                laplacian += d2u[:, d]
+        return laplacian
+
+    def _fit_pytorch_nd(
+        self,
+        problem: Problem,
+        epochs: int,
+        learning_rate: float,
+        verbose: bool,
+        lbfgs_iters: int,
+    ) -> Dict[str, List[float]]:
+        """Train the nD DFR model using PyTorch (Adam, optional LBFGS polish)."""
+        if torch is None:
+            raise RuntimeError("PyTorch backend requires torch.")
+        assert self._model is not None
+        assert self._dst_matrix is not None and self._h_minus_1_weights is not None
+        assert self._nd_domain is not None and self._nd_quad_points is not None
+        model = cast("torch.nn.Module", self._model)
+        domain = self._nd_domain
+        dtype = torch.float64 if self.dtype == "float64" else torch.float32
+
+        pts = torch.tensor(self._nd_quad_points, dtype=dtype, requires_grad=True)
+        dst_matrix = torch.tensor(self._dst_matrix, dtype=dtype)
+        weights = torch.tensor(self._h_minus_1_weights, dtype=dtype)
+
+        f_vals = problem.forcing_fn(self._nd_quad_points)
+        if f_vals.ndim > 1:
+            f_vals = f_vals.flatten()
+        f_vals_t = torch.tensor(f_vals, dtype=dtype)
+
+        def compute_loss() -> "torch.Tensor":
+            x = pts.detach().clone().requires_grad_(True)
+            laplacian_u = self._laplacian_torch(x, model, domain, dtype)
+            weak_residual = f_vals_t + laplacian_u  # f + Delta u (PDE: -Delta u = f)
+            ft_total = torch.mv(dst_matrix, weak_residual) * weights
+            return torch.sum(ft_total**2)
+
+        self._history = {"loss": []}
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+            loss = compute_loss()
+            loss.backward()
+            optimizer.step()
+            self._history["loss"].append(float(loss))
+            if verbose and (epoch + 1) % 100 == 0:
+                console.print(f"Epoch {epoch + 1}/{epochs} - Loss: {float(loss):.6e}", markup=False)
+
+        if lbfgs_iters > 0:
+            lbfgs = torch.optim.LBFGS(
+                model.parameters(),
+                max_iter=lbfgs_iters,
+                line_search_fn="strong_wolfe",
+                history_size=50,
+            )
+
+            def closure() -> "torch.Tensor":
+                lbfgs.zero_grad()
+                loss = compute_loss()
+                loss.backward()
+                return loss
+
+            lbfgs.step(closure)
+            final = float(compute_loss())
+            self._history["loss"].append(final)
+            if verbose:
+                console.print(f"LBFGS polish - Loss: {final:.6e}", markup=False)
+
+        return self._history
+
+    def _fit_tensorflow_nd(self, problem: Problem, epochs: int, learning_rate: float, verbose: bool) -> Dict[str, List[float]]:
+        """Train the nD DFR model using TensorFlow."""
+        if keras is None:
+            raise RuntimeError("TensorFlow backend requires tensorflow and keras.")
+        assert self._model is not None
+        assert self._dst_matrix is not None and self._h_minus_1_weights is not None
+        assert self._nd_domain is not None and self._nd_quad_points is not None
+        model = cast("keras.Model", self._model)
+        domain = self._nd_domain
+
+        optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+        pts = tf.constant(self._nd_quad_points, dtype=self.dtype)
+        dst_matrix = tf.constant(self._dst_matrix, dtype=self.dtype)
+        weights = tf.constant(self._h_minus_1_weights, dtype=self.dtype)
+
+        f_vals = problem.forcing_fn(self._nd_quad_points)
+        if f_vals.ndim > 1:
+            f_vals = f_vals.flatten()
+        f_vals_t = tf.constant(f_vals, dtype=self.dtype)
+
+        @tf.function
+        def train_step() -> "tf.Tensor":
+            with tf.GradientTape() as tape:
+                laplacian_u = tf.reshape(self._laplacian_tf(pts, model, domain), [-1])
+                weak_residual = f_vals_t + laplacian_u  # f + Delta u (PDE: -Delta u = f)
+                ft_total = tf.linalg.matvec(dst_matrix, weak_residual) * weights
+                loss = tf.reduce_sum(ft_total**2)
+            gradients = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+            return loss
+
+        self._history = {"loss": []}
+        for epoch in range(epochs):
+            loss = train_step()
+            self._history["loss"].append(float(loss))
+            if verbose and (epoch + 1) % 100 == 0:
+                console.print(f"Epoch {epoch + 1}/{epochs} - Loss: {float(loss):.6e}", markup=False)
+
+        return self._history
+
     def predict(self, x: np.ndarray) -> np.ndarray:
         """Evaluate the trained model (with cutoff) at given points.
 
         Args:
-            x: Input points of shape (n_points,) or (n_points, 1).
+            x: Input points of shape (n_points,) or (n_points, dim).
 
         Returns:
             Predicted solution values with boundary conditions enforced.
         """
+        if self.dim >= 2:
+            return self._predict_nd(x)
+
         if x.ndim == 1:
             x = x.reshape(-1, 1)
 
@@ -490,3 +703,28 @@ class DFRModel(BaseModel):
                 nn_out = model(x_tensor)
             return cast(np.ndarray, (cutoff * nn_out).numpy().flatten())
         raise ValueError(f"Unknown backend: {self.backend}")
+
+    def _predict_nd(self, x: np.ndarray) -> np.ndarray:
+        """Evaluate the trained nD model (with product cutoff) at points (N, dim)."""
+        x = np.atleast_2d(x)
+        if self._nd_domain is None or self._model is None:
+            raise ValueError("Model not trained yet; call fit() before predict().")
+        domain = self._nd_domain
+
+        cutoff = np.ones((x.shape[0], 1))
+        for d in range(self.dim):
+            lo, hi = domain[d]
+            cutoff *= (x[:, d : d + 1] - lo) * (hi - x[:, d : d + 1])
+
+        if self.backend == "tensorflow":
+            model = cast("keras.Model", self._model)
+            nn_out = model(x, training=False).numpy()
+            return cast(np.ndarray, (cutoff * nn_out).flatten())
+        if self.backend == "pytorch":
+            model = cast("torch.nn.Module", self._model)
+            dtype = torch.float64 if self.dtype == "float64" else torch.float32
+            x_tensor = torch.tensor(x, dtype=dtype)
+            with torch.no_grad():
+                nn_out = model(x_tensor).numpy()
+            return cast(np.ndarray, (cutoff * nn_out).flatten())
+        raise ValueError(f"Backend {self.backend} not implemented for dim >= 2")

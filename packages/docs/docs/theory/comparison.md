@@ -26,19 +26,18 @@ flowchart TD
             D4["Error-equivalent"]
         end
 
-        subgraph hpDFR["hp-DFR (Our Research)"]
-            H1["Sparse Fourier"]
-            H2["hp-adaptivity"]
-            H3["Goal-oriented"]
-            H4["Scalable"]
+        subgraph GODFR["Goal-Oriented DFR (this project)"]
+            H1["Primal + adjoint networks"]
+            H2["QoI-weighted loss"]
+            H3["QoI error bound"]
         end
     end
 
     PDE --> PINNs
     PDE --> DFR
-    DFR -->|"extends"| hpDFR
+    DFR -->|"extends"| GODFR
 
-    style hpDFR fill:#e6f3ff,stroke:#0066cc
+    style GODFR fill:#e6f3ff,stroke:#0066cc
 ```
 
 ## Summary Table

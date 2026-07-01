@@ -5,15 +5,6 @@ const sidebars: SidebarsConfig = {
     'intro',
     {
       type: 'category',
-      label: 'Our Research',
-      items: [
-        'preprint/index',
-        'preprint/literature-review',
-        'preprint/phase3-goal-oriented',
-      ],
-    },
-    {
-      type: 'category',
       label: 'Getting Started',
       items: [
         'getting-started/installation',
@@ -31,6 +22,15 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Our Research',
+      items: [
+        'preprint/index',
+        'preprint/phase3-goal-oriented',
+        'preprint/literature-review',
+      ],
+    },
+    {
+      type: 'category',
       label: 'API Reference',
       items: [
         'api/tensorflow',
@@ -40,7 +40,7 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Background',
+      label: 'Reference',
       items: [
         'paper/summary',
       ],

@@ -1,13 +1,22 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 
+// Project version, read from the root package.json (bumped by the release
+// workflow). Rendered as a navbar badge via the .version-badge class.
+const rootPkgPath = path.resolve(__dirname, "../../package.json");
+const rootPkg = JSON.parse(fs.readFileSync(rootPkgPath, "utf-8"));
+const projectVersion = rootPkg.version ?? "0.0.0";
+
 const config: Config = {
-  title: "Adaptive hp-DFR",
-  tagline: "Goal-Oriented Deep Fourier Residual Methods with Adaptive hp-Refinement",
-  favicon: "img/favicon.ico",
+  title: "Goal-Oriented DFR",
+  tagline: "Goal-Oriented Deep Fourier Residual methods for solving PDEs with neural networks",
+  favicon: "img/logo.svg",
 
   url: "https://caverac.github.io",
   baseUrl: "/hp-dfr/",
@@ -61,9 +70,9 @@ const config: Config = {
   themeConfig: {
     image: "img/social-card.png",
     navbar: {
-      title: "Adaptive hp-DFR",
+      title: "Goal-Oriented DFR",
       logo: {
-        alt: "Adaptive hp-DFR Logo",
+        alt: "Goal-Oriented DFR Logo",
         src: "img/logo.svg",
       },
       items: [
@@ -72,6 +81,13 @@ const config: Config = {
           sidebarId: "docsSidebar",
           position: "left",
           label: "Documentation",
+        },
+        {
+          // Project version tag, fed from the root package.json version read
+          // above. Rendered with the .version-badge class in custom.css.
+          type: "html",
+          position: "right",
+          value: `<span class="version-badge">v${projectVersion}</span>`,
         },
         {
           href: "https://github.com/caverac/hp-dfr",

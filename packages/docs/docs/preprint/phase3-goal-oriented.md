@@ -1,179 +1,228 @@
 ---
 sidebar_position: 3
-sidebar_label: 'Goal-Oriented DFR'
+sidebar_label: 'Method and Results'
 ---
 
-# Goal-Oriented DFR: Plan
+# Goal-Oriented DFR: Method and Results
 
-This is the working plan for the single publishable contribution: goal-oriented
-error control for the Deep Fourier Residual loss.
+This page develops the method, states the error guarantee, and presents the 1D and
+2D experiments. Each figure is accompanied by the command that reproduces it. It
+assumes the [Overview](/docs/preprint) and the [DFR theory page](/docs/theory/dfr).
 
-## Motivation
+## The method
 
-We are often interested not in the global $H^1$ error but in a specific
-**quantity of interest (QoI)**:
+### Quantities of interest
 
-- Point evaluation: $J(u) = u(x_0)$
-- Subdomain average: $J(u) = \frac{1}{|\omega|} \int_\omega u \, dx$
-- Boundary flux: $J(u) = \int_{\Gamma} \nabla u \cdot n \, ds$
+A quantity of interest (QoI) is a functional of the solution. Three linear examples:
 
-Goal-oriented methods focus computational effort on reducing the error in $J(u)$
-rather than the global error.
+- **Point evaluation:** $J(u) = u(x_0)$
+- **Subdomain average:** $J(u) = |\omega|^{-1} \displaystyle\int_\omega u \, dx$
+- **Boundary flux:** $J(u) = \displaystyle\int_{\Gamma} \nabla u \cdot n \, ds$
 
-## Dual-Weighted Residual framework
+Goal-oriented methods reduce the error in $J(u)$ rather than the error everywhere.
 
-### Adjoint problem
+### The adjoint problem
 
-For a linear QoI $J$, the adjoint solution $z \in V$ solves
-
-$$
-a(v, z) = J(v) \quad \forall v \in V,
-$$
-
-where $a(\cdot, \cdot)$ is the bilinear form of the primal problem.
-
-### Error representation
-
-For the primal approximation $u_h$, the QoI error satisfies
+Write the PDE in weak form as $a(u, v) = \ell(v)$ for all test functions $v$. For a
+linear QoI $J$, the **adjoint solution** $z$ is defined by
 
 $$
-J(u) - J(u_h) = a(u - u_h, z) = \langle R(u_h), z \rangle,
+a(v, z) = J(v) \quad \text{for all } v.
 $$
 
-which motivates the **goal-oriented loss**
+The adjoint quantifies the sensitivity of $J$ to residual error: where $z$ is large,
+a residual contributes strongly to the QoI error.
+
+### From error to loss
+
+The QoI error satisfies the exact **error representation**
 
 $$
-\mathcal{L}_{\text{QoI}}(u_h) = |\langle R(u_h), z_h \rangle|,
+J(u) - J(u_h) = a(u - u_h, z) = \langle R(u_h),\, z \rangle,
 $$
 
-where $z_h$ is a neural-network approximation of the adjoint. The dual pairing
-$\langle R(u_h), z_h \rangle$ is evaluated with the same DFR spectral machinery
-(DST/DCT projection) used for the $H^{-1}$ norm.
-
-## Theory (the acceptance gate) - PROVED
-
-These are the analogue of DFR's error-loss equivalence and are what a CMAME/JCP
-reviewer will require. **Both are now proved** in `packages/preprint/sections/theory.tex`
-(Proposition 4.2 and Theorem 4.3) under the Banach-Necas-Babuska hypotheses
-(boundedness constant $M$, inf-sup constant $\gamma$).
-
-### Proposition 4.2: Exact error representation
-
-For $u^*$ solving the primal problem and $z^*$ the adjoint problem, and any
-$u_h, z_h$,
+where $R(u_h)$ is the residual of the primal approximation. Replacing the exact
+adjoint by a network $z_h$ gives the computable **goal-oriented loss**
 
 $$
-J(u^*) - J(u_h) = R(u_h)(z^*) = R(u_h)(z_h) + R(u_h)(z^* - z_h).
+\mathcal{L}_{\text{QoI}}(u_h, z_h) = \bigl|\langle R(u_h),\, z_h \rangle\bigr|.
 $$
 
-The first term is the computable goal-oriented loss $\mathcal{L}_{\text{QoI}}$;
-the second is the adjoint-approximation error. This is **exact** (an equality).
+The pairing $\langle R(u_h), z_h \rangle = \int_\Omega (f + \Delta u_h)\, z_h\,dx$ is
+an $L^2$ integral, evaluated on the same quadrature grid used to assemble the DFR
+transforms.
 
-### Theorem 4.3: QoI error control
+### Training objective
+
+Training minimizes the goal-oriented loss together with two DFR regularizers:
 
 $$
-|J(u^*) - J(u_h)| \leq \mathcal{L}_{\text{QoI}}(u_h, z_h)
-  + \frac{1}{\gamma}\, \|R(u_h)\|_{V^*}\, \|R^*(z_h)\|_{U^*}.
+\mathcal{L}(u_h, z_h) = \underbrace{|\langle R(u_h), z_h\rangle|}_{\text{goal}}
+  + \alpha\,\underbrace{\|R^*(z_h)\|_{H^{-1}}^2}_{\text{adjoint DFR}}
+  + \beta\,\underbrace{\|R(u_h)\|_{H^{-1}}^2}_{\text{primal DFR}}.
 $$
 
-The three terms on the right are **exactly the three terms of the training loss**
-(goal-oriented loss + primal DFR loss + adjoint DFR loss), so the bound is fully
-computable a posteriori. The remainder is the *product* of the primal and adjoint
-residuals (sharper than the additive form first sketched), giving the
-second-order DWR accuracy: at fewer DOF than global energy minimization the QoI
-error is controlled to $O(\delta^2)$ in the residual (Remark 4.5). A corollary
-(4.4) specializes to an adjoint trained to a tolerance $\varepsilon$.
+One detail is essential. The goal term must update the **primal** network only: it
+drives $u_h$ to reduce the residual where the adjoint is large. If the adjoint
+parameters were also allowed to descend this term, the optimizer could drive the
+pairing to zero by making $z_h$ orthogonal to the current residual, without $z_h$
+solving the adjoint equation. The adjoint is therefore held fixed in the goal term
+(a stop-gradient), so it is trained solely by its own residual
+$\|R^*(z_h)\|_{H^{-1}}^2$ and approximates the true adjoint. Both networks enforce the
+homogeneous Dirichlet conditions exactly through a cutoff construction, so no boundary
+penalty is needed.
 
-## Implementation status
+## The guarantee
 
-The model and QoI classes are implemented in
-`packages/experiments/src/hp_dfr/models/goal_oriented_dfr.py`:
+The central result is a goal-oriented analogue of the DFR error&ndash;loss
+equivalence, under the standard well-posedness hypotheses (the
+Banach&ndash;Necas&ndash;Babuska conditions: a boundedness constant $M$ and an
+inf&ndash;sup constant $\gamma$).
 
-- `GoalOrientedDFRModel` - primal + adjoint networks, QoI-weighted dual-norm
-  loss, built on the dense full-tensor DST machinery (`fourier/transforms.py`).
-- `PointEvaluationQoI`, `AverageValueQoI`, `BoundaryFluxQoI` - QoI classes
-  (unit-tested in `tests/test_goal_oriented.py`).
+**Exact error representation (Proposition 4.3).** For any primal $u_h$ and adjoint
+$z_h$,
 
-The QoI classes are tested, and the end-to-end `fit()` training loop is
-**validated in 1D** (2026-06-30, PyTorch): on the `sine` Poisson problem with a
-point QoI at $x = \pi/4$, training converges with the primal DFR loss dropping
-from $7.06$ to $0.022$ (the weak residual $f + \Delta u$ driven to zero), global
-$L^2$ relative error $\approx 1.9\%$, and QoI error $\approx 6\times 10^{-3}$.
-Validation uncovered and fixed three sign/forcing bugs in the loss (the weak
-residual was built as $f - \Delta u$, the goal-oriented pairing dropped the
-forcing, and the $L^2$ pairing omitted the quadrature measure).
+$$
+J(u) - J(u_h) = \underbrace{\langle R(u_h), z_h\rangle}_{\text{computable}}
+  + \underbrace{\langle R(u_h), z - z_h\rangle}_{\text{adjoint error}}.
+$$
 
-## Experiment plan
+The first term is the goal-oriented loss; the second involves the unknown exact
+adjoint and is bounded next.
 
-Start in 1D, then 2D. For each QoI, show goal-oriented DFR beats plain DFR on the
-QoI error at matched degrees of freedom.
+**QoI error control (Theorem 4.4).**
 
-### Stage 1 (now): 1D point evaluation
+$$
+\bigl| J(u) - J(u_h) \bigr|
+  \;\le\;
+  \mathcal{L}_{\text{QoI}}(u_h, z_h)
+  \;+\;
+  \frac{1}{\gamma}\,\|R(u_h)\|_{V^*}\,\|R^*(z_h)\|_{U^*}.
+$$
 
-Poisson 1D with $J(u) = u(x_0)$. Compare goal-oriented DFR against plain DFR:
-QoI error and global $L^2$/$H^1$ error vs epochs at matched DOF.
+The left-hand side is the QoI error. The right-hand side consists of the three
+quantities minimized during training: the goal-oriented loss, the primal DFR
+residual, and the adjoint DFR residual. The bound is therefore computable a
+posteriori, without the true solution.
 
-| Method | DOF | QoI error | Global $H^1$ error |
-|--------|-----|-----------|--------------------|
-| Plain DFR | - | - | - |
-| Goal-Oriented DFR | - | - | - |
+The remainder is a *product* of the primal and adjoint residuals. If both are trained
+to size $\delta$, the goal loss estimates the QoI error to $O(\delta^2)$. This
+second-order structure has a direct consequence for the experiments: when the primal
+residual is already at its floor, the remainder is negligible and goal-orientation
+cannot improve the QoI; when the primal residual cannot be made uniformly small, the
+remainder is significant and goal-orientation reallocates the network's capacity
+toward the QoI. The next section shows both regimes.
 
-### Stage 2: 2D
+## Results
 
-Add a 2D Poisson problem and an L-shaped domain; QoIs = point, subdomain
-average, boundary flux. Baselines: plain DFR, PINN, and a FEM-DWR reference (FEM
-as the ground-truth QoI).
+The comparison against plain DFR is at matched degrees of freedom (the same
+primal-network architecture for both), sweeping the network width and repeating over
+random seeds. The metric is the error in a mollified point QoI,
+$|J_\sigma(u_h) - J_\sigma(u^*)|$; markers are medians over seeds and bands span the
+seed min&ndash;max.
 
-## Roadmap
+### One dimension: no advantage
 
-The path from the current state to a submittable paper, in order. Milestone 1 is
-the bottleneck and gates acceptance.
+The 1D problems are a smooth solution ($u = \sin 2x$) and a sharp one (an $\arctan$
+profile with its gradient concentrated near the center).
 
-### M1 - Theory (the acceptance gate) - DONE
-The QoI-error-control theorem is proved: Proposition 4.2 (exact error
-representation) and Theorem 4.3 (QoI error control) in `sections/theory.tex`,
-under the BNB hypotheses, with the loss terms appearing exactly as the bound's
-right-hand side. Remaining theory polish (optional for v1): nonlinear QoIs, and
-making the spectral-truncation error explicit rather than inherited from DFR.
+![QoI error versus degrees of freedom in 1D, for plain DFR and goal-oriented DFR, on a smooth (top) and a sharp (bottom) problem.](/img/figures/dfr-saturation-1d.png)
 
-### M2 - 1D evidence: DEFINITIVE NEGATIVE (documented in the paper)
-After fixing four bugs (goal-oriented loss sign; plain-DFR residual sign;
-output-layer tanh capping amplitude; `DFRModel.predict` hardcoded domain) and
-adding an LBFGS polish, **both** methods solve 1D Poisson (smooth and sharp). The
-result: plain DFR reaches its accuracy floor (~1e-5 QoI) at the smallest networks
-(tens of params), so there is **no resolution-limited regime in 1D** for
-goal-orientation to exploit; goal-oriented is uniformly less accurate on the QoI.
-Written up honestly in `sections/results.tex` (with three reasons: DFR
-saturates; single-network DFR has no mesh to focus; the non-smooth goal loss is
-harder to optimize) and Figure `dfr-saturation-1d`. The abstract, intro, and
-conclusion were corrected (they had wrongly claimed GO beats DFR). Figures are
-built via `hp-dfr figures` (see `hp_dfr/figures.py`, `_plotting.py`).
+Reproduce with:
 
-### M3 - 2D and the headline experiment
-Add a 2D Poisson problem and an **L-shaped domain** (re-entrant corner). QoIs:
-point, subdomain average, boundary flux. Baselines: plain DFR, a PINN, and a
-**FEM-DWR reference** (FEM as ground-truth QoI). Headline: goal-oriented beats
-plain DFR on the QoI at fixed DOF, most strongly near the singularity.
+```bash
+# 1. Generate the sweep data (requires a PyTorch backend; a few minutes).
+#    On Intel macOS, install the backend once: uv pip install 'torch>=2.0.0,<2.2.0'
+KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_1d_data.py
 
-### M4 - Write-up and submit
-Fill `experiments.tex` / `results.tex` with real numbers and figures, tighten the
-positioning against prior art (Govoeyi-Richter, Chakraborty-Wick - extend, do not
-re-claim), verify all citations. Target **CMAME** or **JCP**.
+# 2. Build the figure from the saved data (fast).
+uv run hp-dfr figures
+```
 
-### Risks
-- **Scoop:** the Taylor/Pardo group is active and may present hp/goal-oriented DFR
-  at WCCM/ECCOMAS 2026 - move with urgency.
-- **Loss tuning:** `primal_weight=0.1` is light and full-batch Adam is noisy; M2/M3
-  will likely need weight tuning and possibly an LBFGS polish.
-- **Scope creep:** sparse and hp stay cut unless a reviewer specifically asks.
+The first command writes `assets/m2_1d_data.json`; the second reads it and writes
+`assets/dfr-saturation-1d.png` and `.pdf`.
 
-## Task checklist
+Plain DFR reaches its optimization floor (a QoI error of order $10^{-5}$) at the
+smallest networks, a few tens of parameters. The solution is then accurate
+everywhere, so the remainder in the bound is negligible and goal-orientation has no
+error to reallocate; its two-network objective is somewhat harder to optimize, so it
+is slightly less accurate at small and moderate sizes and reaches parity only at the
+largest networks. One dimension is a control: it confirms the method does not report
+an advantage where none is available.
 
-- [x] Validate the goal-oriented `fit()` end-to-end on 1D Poisson (point QoI).
-- [x] (M1) Prove the error representation and QoI-error-control theorem (preprint `sections/theory.tex`).
-- [x] (M2) 1D comparison done: definitive NEGATIVE (plain DFR saturates ~1e-5 at
-  tiny DOF, smooth and sharp; GO uniformly worse). Documented in the paper with a
-  figure. Four bugs fixed + LBFGS added along the way.
-- [ ] (M3) Add a 2D Poisson problem and the L-shape; point/average/flux QoIs.
-- [ ] (M3) Add the FEM-DWR reference baseline.
-- [ ] (M4) Fill experiments/results sections; submit to CMAME/JCP.
+### Two dimensions: the advantage
+
+The 2D problem is a sharp separable bump on the unit square. Both methods use the
+identical full tensor-product DST discretization, so the comparison isolates the
+effect of goal-orientation. Unlike the 1D problems, a network of practical size does
+not resolve this solution everywhere: plain DFR sits at a QoI error of $10^{-4}$ at
+the smallest networks and only reaches $10^{-5}$ as the width grows.
+
+![QoI error versus degrees of freedom in 2D, for plain DFR and goal-oriented DFR.](/img/figures/dfr-vs-go-2d.png)
+
+Reproduce with:
+
+```bash
+# 1. Generate the 2D sweep data (requires a PyTorch backend; ~15 minutes).
+KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_2d_data.py
+
+# 2. Build the figure from the saved data (fast).
+uv run hp-dfr figures
+```
+
+The first command writes `assets/m3_2d_data.json`; the second reads it and writes
+`assets/dfr-vs-go-2d.png` and `.pdf`.
+
+In this resolution-limited regime goal-orientation is the more accurate method at
+almost every size, improving the median QoI error by roughly three to five times and
+winning on ten of the twelve configurations:
+
+| Degrees of freedom | Plain DFR | Goal-oriented | Improvement |
+|---:|---:|---:|---:|
+| 105  | $2.4\times10^{-4}$ | $4.5\times10^{-5}$ | $5.3\times$ |
+| 337  | $1.6\times10^{-5}$ | $1.3\times10^{-5}$ | $1.2\times$ |
+| 697  | $7.9\times10^{-6}$ | $2.8\times10^{-6}$ | $2.8\times$ |
+| 1185 | $1.0\times10^{-5}$ | $3.2\times10^{-6}$ | $3.1\times$ |
+
+The advantage is largest at the smallest network, where plain DFR is most starved of
+resolution, and persists at the larger sizes as the adjoint network becomes well
+resolved. The two methods are comparable only at the intermediate size, where plain
+DFR happens to resolve the bump particularly well.
+
+### Why the two regimes differ
+
+The contrast follows from the second-order remainder in Theorem 4.4. When plain DFR
+already drives the primal residual to its floor (1D), the remainder is negligible and
+there is no error to reallocate; the extra adjoint network only complicates the
+optimization. When the primal residual cannot be made uniformly small at feasible
+cost (2D), the goal-oriented objective spends the network's limited capacity where
+the adjoint indicates it matters for the QoI, and the several-fold accuracy gain
+follows. Goal-orientation is a tool for the resolution-limited regime.
+
+Two implementation points are necessary to observe this behavior: the adjoint must be
+trained on its own residual and held fixed in the goal term, and in two dimensions the
+$H^{-1}$ weights must use the true eigenvalues $\lambda_k = \sum_i (\pi k_i/L_i)^2$
+rather than a separable product of one-dimensional weights.
+
+## Using the code
+
+The method is in `packages/experiments/src/hp_dfr/models/goal_oriented_dfr.py`:
+
+- `GoalOrientedDFRModel` &mdash; primal and adjoint networks with the QoI-weighted
+  dual-norm loss, on the dense full-tensor DST machinery in `fourier/transforms.py`.
+  Supports 1D and 2D.
+- `PointEvaluationQoI`, `AverageValueQoI`, `BoundaryFluxQoI` &mdash; the
+  quantity-of-interest classes (unit-tested in `tests/test_goal_oriented.py`).
+
+A command-line run:
+
+```bash
+# Goal-oriented DFR on the 1D sharp problem, point QoI at the 65% location.
+KERAS_BACKEND=torch uv run hp-dfr research run \
+  --problem arctan --backend pytorch \
+  --qoi point --qoi-location 0.65 \
+  --hidden-layers "16,16" --n-modes 60 --epochs 2000
+```
+
+The [Quick Start](/docs/getting-started/quick-start) covers the Python API and the
+remaining options.

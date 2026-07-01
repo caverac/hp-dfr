@@ -4,59 +4,118 @@ sidebar_position: 1
 
 # Introduction
 
-Welcome to the **Adaptive hp-DFR** documentation. This project extends the Deep Fourier Residual (DFR) method with **adaptive hp-refinement** and **goal-oriented error estimation** for solving Partial Differential Equations (PDEs) using neural networks.
+The Deep Fourier Residual (DFR) method solves partial differential equations with
+neural networks using a loss that is provably equivalent to the solution error.
+This project extends DFR to *goal-oriented* error control: when the object of
+interest is a single functional of the solution rather than the solution
+everywhere, the loss can be weighted toward that functional. This page states the
+problem, the method, and the main empirical finding, and points to the pages that
+develop each in detail.
 
-## Our Research
+## Solving PDEs with neural networks
 
-We propose a novel extension to the Deep Fourier Residual method that addresses key limitations of existing approaches through three innovations:
+A partial differential equation (PDE) relates an unknown field to its derivatives.
+The model problem throughout these pages is Poisson's equation,
 
-### 1. Adaptive Fourier Mode Selection
+$$
+-\,u''(x) = f(x),
+$$
 
-Instead of using a fixed truncation of Fourier modes, we dynamically select modes based on their contribution to the residual norm. This addresses the curse of dimensionality:
+with $f$ a known source and $u$ the unknown solution. A neural-network solver
+represents $u$ by a network $u_\theta$ with parameters $\theta$ and chooses $\theta$
+to make $u_\theta$ satisfy the equation as closely as possible. What "as closely as
+possible" means is fixed by the loss function, and the choice of loss determines
+how faithfully the minimizer approximates the true solution.
 
-- Standard DFR requires $O(N^d)$ Fourier modes in $d$ dimensions
-- Our sparse tensor methods reduce this to $O(N(\log N)^{d-1})$
+## The DFR loss and its guarantee
 
-### 2. Hierarchical Neural Network Architecture (hp-refinement)
+The residual of a candidate solution is the amount by which it fails to satisfy the
+equation. Minimizing the pointwise size of the residual is the basis of
+physics-informed neural networks (PINNs). The size of the residual, however, is not
+in general proportional to the size of the solution error: a small residual can
+coexist with a solution that is still inaccurate.
 
-We use a multi-scale network combining:
+DFR measures the residual in the $H^{-1}$ dual norm, which it evaluates with a
+Fourier transform. Under the standard well-posedness conditions this norm is
+equivalent to the energy-norm error, so the DFR loss and the error vanish together
+and track each other during training. The [DFR theory page](/docs/theory/dfr)
+derives the weak form, the dual norm, and the Fourier computation in full.
 
-- **h-refinement**: Domain partitioning with local networks
-- **p-refinement**: Adaptive network depth/width
+## Quantities of interest
 
-This focuses computational resolution where the solution requires it most.
+The DFR guarantee concerns the global error. Applications frequently require instead
+a single functional of the solution, a **quantity of interest** (QoI):
 
-### 3. Goal-Oriented Error Estimation
+- a point value, $\;J(u) = u(x_0)$;
+- an average over a region, $\;J(u) = |\omega|^{-1}\int_\omega u\,dx$;
+- a boundary flux, $\;J(u) = \int_\Gamma \nabla u \cdot n \, ds$.
 
-For quantities of interest (QoI), we compute the dual-weighted residual to focus computational effort where it affects the output most. This directly targets what matters for your application rather than minimizing a generic error measure.
+A small global error is sufficient but not necessary for an accurate QoI, and
+driving the global error below a tolerance can be wasteful when only $J(u)$ matters.
 
-## Why Is This Novel?
+## Goal-oriented DFR
 
-The original DFR method establishes that the $H^{-1}$ dual norm loss is equivalent to the $H^1$ error for well-posed problems. Our approach addresses key limitations:
+The dual-weighted residual (DWR) method controls a single QoI in the finite-element
+setting by introducing an adjoint problem whose solution measures the sensitivity of
+$J$ to residual error in each region. Goal-oriented DFR applies this construction to
+the DFR loss. Together with the primal network $u_\theta$ it trains an adjoint
+network $z_\phi$, and it weights the primal loss toward the QoI through the residual
+pairing
 
-- **Curse of dimensionality**: Standard DFR doesn't scale well to higher dimensions
-- **Uniform refinement inefficiency**: Using the same number of modes everywhere wastes computation
-- **Energy norm mismatch**: For certain PDEs (e.g., Helmholtz), $H^{-1}$ may not control the energy-norm error
+$$
+\mathcal{L}_{\text{QoI}}(u_\theta, z_\phi) = \bigl|\langle R(u_\theta),\, z_\phi \rangle\bigr|.
+$$
 
-This is the first integration of hp-adaptivity and goal-oriented error estimation with DFR-style dual norm losses for physics-informed learning.
+The [method and results page](/docs/preprint/phase3-goal-oriented) develops the
+adjoint problem, the error representation, and the training objective, including the
+one detail that makes the adjoint informative: it is trained on its own residual and
+held fixed in the pairing, so it approximates the true adjoint rather than collapsing
+to a value that makes the pairing vanish.
 
-## Key Features
+## Main finding
 
-- **Multi-backend support**: TensorFlow, JAX, and PyTorch implementations
-- **Reproducible experiments**: Scripts to reproduce all results
-- **Scalable infrastructure**: AWS CDK templates for running experiments at scale
-- **Comprehensive documentation**: Theory explanations and API reference
+The method rests on two results, one theoretical and one empirical.
 
-## Background
+The theorem is a goal-oriented analogue of the DFR guarantee: the QoI-weighted loss,
+together with a computable remainder, bounds the error in the quantity of interest,
+and every term of the bound is available during training. The remainder is a
+*product* of the primal and adjoint residuals, which is the source of the empirical
+behavior below.
 
-This work builds upon the Deep Fourier Residual method introduced in:
+The experiments locate where goal-orientation helps. On 1D Poisson problems, plain
+DFR reaches its optimization floor (an error of order $10^{-5}$) at very small
+networks; the solution is already accurate everywhere, the remainder is negligible,
+and goal-orientation offers no advantage. On a 2D problem with a sharp feature, a
+network of practical size cannot resolve the solution everywhere, the remainder is
+no longer negligible, and goal-orientation reduces the QoI error by roughly three to
+five times at matched degrees of freedom. The [results](/docs/preprint/phase3-goal-oriented#results)
+present both cases, with the command that reproduces each figure.
 
-> **A Deep Fourier Residual Method for solving PDEs using Neural Networks**
-> Jamie M. Taylor, David Pardo, Ignacio Muga
+## Scope
+
+The repository began with a broader plan combining three extensions of DFR (sparse
+Fourier modes, hp-adaptive domain decomposition, and goal-oriented error control).
+A review of the literature and the existing methods narrowed it to goal-oriented DFR,
+the most clearly distinct of the three. The
+[background and positioning page](/docs/preprint/literature-review) records that
+reasoning and places the work among related methods.
+
+## Reading path
+
+1. [Install the package](/docs/getting-started/installation) and
+   [run an experiment](/docs/getting-started/quick-start).
+2. [Theory: PINNs](/docs/theory/pinns) and [Theory: DFR](/docs/theory/dfr) &mdash;
+   the two ingredients.
+3. [Our research](/docs/preprint) &mdash; the goal-oriented method, the theorem, and
+   the 1D and 2D results with reproducible figures.
+4. [Background: the original DFR method](/docs/paper/summary) and the
+   [API reference](/docs/api/pytorch).
+
+## Reference
+
+This work builds on the Deep Fourier Residual method:
+
+> **A Deep Fourier Residual Method for solving PDEs using Neural Networks.**
+> Jamie M. Taylor, David Pardo, Ignacio Muga.
+> *Computer Methods in Applied Mechanics and Engineering* **405** (2023) 115850.
 > [arXiv:2210.14129](https://arxiv.org/abs/2210.14129)
-
-See the [Background](/docs/paper/summary) section for a detailed summary of the original DFR method and its theoretical foundations.
-
-## Getting Started
-
-Ready to dive in? Check out the [Installation Guide](/docs/getting-started/installation) to set up your environment, or explore the [Theory](/docs/theory/pinns) section to understand the mathematical foundations.

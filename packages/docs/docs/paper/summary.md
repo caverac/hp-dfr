@@ -5,7 +5,7 @@ sidebar_label: 'Background: Original DFR'
 
 # Background: The Original DFR Method
 
-Our adaptive hp-DFR method builds upon the theoretical foundations established in the original Deep Fourier Residual paper. This section summarizes the key concepts from:
+This project builds on the original Deep Fourier Residual method. This section summarizes its key concepts, following:
 
 > **"A Deep Fourier Residual Method for solving PDEs using Neural Networks"** by Taylor, Pardo, and Muga.
 
@@ -133,16 +133,16 @@ The paper demonstrates strong correlation between the DFR loss and $H^1$ error d
 2. **Boundary conditions**: Dirichlet or Neumann on each face
 3. **Computational cost**: Fourier transform overhead
 
-## Limitations Addressed by Our Research
+## Relation to this project
 
-The original DFR paper identified several limitations that our adaptive hp-DFR method directly addresses:
-
-1. **Domain restriction**: Rectangular domains only → We extend via domain decomposition (h-refinement)
-2. **Curse of dimensionality**: $O(N^d)$ modes required → Our sparse tensor methods reduce to $O(N(\log N)^{d-1})$
-3. **Uniform refinement**: Same resolution everywhere → hp-adaptivity focuses computation where needed
-4. **Goal-oriented adaptivity**: Suggested as future work → We implement dual-weighted residual estimation
-
-See the [Introduction](/docs/intro) for details on how our method addresses these challenges.
+This project extends the original DFR method in the goal-oriented direction listed by
+the authors as future work: it applies dual-weighted-residual error control to the
+$H^{-1}$ dual-norm loss, so that training targets a quantity of interest rather than
+the global energy norm. The other limitations above (general domains, higher
+dimensions, non-uniform refinement) are outside the present scope; the
+[Background and Positioning](/docs/preprint/literature-review#how-this-project-is-scoped)
+page explains that choice. See [Our Research](/docs/preprint) for the method and
+results.
 
 ## Links
 

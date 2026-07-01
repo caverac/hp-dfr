@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Installation
 
-This guide covers how to set up the Adaptive hp-DFR environment.
+This guide covers how to set up the Goal-Oriented DFR environment.
 
 ## Prerequisites
 

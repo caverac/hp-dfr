@@ -171,34 +171,15 @@ DFR is particularly advantageous when:
 - **Implementation complexity**: More involved than standard PINNs
 - **Curse of dimensionality**: Requires $O(N^d)$ Fourier modes in $d$ dimensions
 
-:::tip Our Research
-The [adaptive hp-DFR method](/docs/preprint) addresses the curse of dimensionality using sparse tensor Fourier methods, reducing complexity from $O(N^d)$ to $O(N(\log N)^{d-1})$.
+:::note Related work
+The full tensor product of Fourier modes grows as $O(N^d)$ in dimension $d$. Sparse
+tensor and hyperbolic-cross constructions reduce this for functions with bounded
+mixed derivatives, and the original DFR authors list better basis choices as future
+work. This project does not pursue that direction; it extends DFR toward
+[goal-oriented error control](/docs/preprint) instead. The
+[Background and Positioning](/docs/preprint/literature-review#how-this-project-is-scoped)
+page discusses the trade-off.
 :::
-
-```mermaid
-flowchart TD
-    subgraph Problem["Scaling Problem"]
-        A["d-dimensional PDE"]
-    end
-
-    subgraph Standard["Standard DFR"]
-        B["Full tensor Fourier modes"]
-        C["O(N^d) modes required"]
-        D["Exponential growth"]
-    end
-
-    subgraph Adaptive["Adaptive hp-DFR"]
-        E["Sparse tensor Fourier modes"]
-        F["O(N(log N)^{d-1}) modes"]
-        G["Near-linear growth"]
-    end
-
-    A --> B --> C --> D
-    A --> E --> F --> G
-
-    style D fill:#f66,color:#fff
-    style G fill:#6f6,color:#fff
-```
 
 ## Example: 1D Poisson with DFR
 

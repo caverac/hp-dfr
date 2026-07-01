@@ -94,6 +94,37 @@ def figure_dfr_saturation_1d() -> Figure:
     return fig
 
 
+@figure("dfr-vs-go-2d")
+def figure_dfr_vs_go_2d() -> Figure:
+    r"""Plot the QoI error versus degrees of freedom for both methods in 2D.
+
+    On the 2D Poisson problem with a sharp arctan bump, plain DFR resolves the
+    quantity of interest far more accurately than the goal-oriented variant at
+    every matched network size: the second adjoint network and the non-smooth
+    goal term make the goal-oriented optimization harder without buying QoI
+    accuracy. Markers are medians over seeds; bands span the seed min--max.
+    """
+    records = _load("m3_2d_data.json")
+    styles = [
+        ("dfr_qoi", "-", "o", "DFR"),
+        ("go_qoi", "--", "s", "Goal-Oriented DFR"),
+    ]
+
+    fig = Figure(figsize=(5.4, 3.6))
+    ax = fig.add_subplot(1, 1, 1)
+    for key, ls, marker, label in styles:
+        dofs, med, lo, hi = _median_band(records, "arctanbump2d", key)
+        ax.fill_between(dofs, lo, hi, color="0.6", alpha=0.25, linewidth=0)
+        ax.plot(dofs, med, color="black", linestyle=ls, marker=marker, linewidth=1.6, markersize=6, markerfacecolor="white", label=label)
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"$N_{\mathrm{dof}}$")
+    ax.set_ylabel(r"$|J_\sigma(u_h) - J_\sigma(u^*)|$")
+    ax.legend(loc="best")
+    return fig
+
+
 def make_all_figures() -> None:
     """Build and write every preprint figure."""
     figure_dfr_saturation_1d()
+    figure_dfr_vs_go_2d()

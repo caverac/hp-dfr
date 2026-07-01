@@ -11,9 +11,10 @@ This guide walks you through running your first PINNs and DFR experiments using 
 The `hp-dfr` CLI provides three main command groups:
 
 ```bash
-hp-dfr pinns ...     # Physics-Informed Neural Networks
+hp-dfr pinns ...     # Physics-Informed Neural Networks (baseline)
 hp-dfr dfr ...       # Deep Fourier Residual method (reference paper)
-hp-dfr research ...  # Adaptive hp-DFR (our research)
+hp-dfr research ...  # Goal-Oriented DFR (this project)
+hp-dfr figures       # Build the preprint figures from saved data
 ```
 
 ## Running Your First Experiment
@@ -49,29 +50,24 @@ hp-dfr dfr run \
   --hidden-layers "20,20,20,20"
 ```
 
-### hp-DFR Research Example
+### Goal-Oriented DFR Example
 
 ```bash
-# Run adaptive hp-DFR
+# Goal-oriented DFR on the sharp 1D problem, point QoI at the 65% location
 hp-dfr research run \
-  --problem discontinuous \
-  --backend pytorch \
-  --initial-divisions 4 \
-  --adapt-every 100
-
-# Run sparse DFR for higher dimensions
-hp-dfr research run-sparse \
-  --problem sine \
-  --backend pytorch \
-  --dim 2 \
-  --max-level 16
-
-# Run goal-oriented DFR
-hp-dfr research run-goal-oriented \
-  --problem sine \
+  --problem arctan \
   --backend pytorch \
   --qoi point \
-  --qoi-location 0.5
+  --qoi-location 0.65 \
+  --hidden-layers "16,16" \
+  --n-modes 60 \
+  --epochs 2000
+
+# Subdomain-average QoI instead of a point value
+hp-dfr research run \
+  --problem sine \
+  --backend pytorch \
+  --qoi average
 ```
 
 ## Listing Available Options
@@ -222,14 +218,31 @@ hp-dfr dfr run --problem sine --n-modes 10 --epochs 10000 --output results/sine.
 hp-dfr dfr run --problem arctan --n-modes 20 --epochs 20000 --output results/arctan.png
 ```
 
+## Reproducing this project's figures
+
+The goal-oriented figures are built from saved sweep data in two steps: generate the
+data (slow; requires a PyTorch backend), then render the figures (fast).
+
+```bash
+# Generate the 1D and 2D sweep data into the assets/ directory.
+KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_1d_data.py
+KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_2d_data.py
+
+# Render the figures (assets/dfr-saturation-1d.* and assets/dfr-vs-go-2d.*).
+uv run hp-dfr figures
+```
+
+See [Method and Results](/docs/preprint/phase3-goal-oriented#results) for the figures
+and their interpretation.
+
 ## Available Problems
 
 | Problem | CLI Name | Description | Best Method |
 |---------|----------|-------------|-------------|
 | Smooth sine | `sine` | $-u'' = 4\sin(2x)$ | Both work well |
 | Large gradients | `arctan` | Sharp transition layer | DFR preferred |
-| Discontinuous | `discontinuous` | Jump in coefficients | hp-DFR preferred |
-| Point source | `delta` | Delta function forcing | hp-DFR preferred |
+| Discontinuous | `discontinuous` | Jump in coefficients | DFR |
+| Point source | `delta` | Delta function forcing | DFR |
 
 ## Command Reference
 
@@ -259,18 +272,18 @@ hp-dfr dfr run --problem arctan --n-modes 20 --epochs 20000 --output results/arc
 | `--n-modes` | 10 | Number of Fourier modes |
 | `--n-quadrature` | 100 | Quadrature points for integration |
 
-### hp-DFR Research Options
+### Goal-Oriented DFR Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--initial-divisions` | 2 | Initial domain partitions |
-| `--interface-penalty` | 10.0 | Interface coupling weight |
-| `--adapt-every` | 100 | Epochs between adaptations |
-| `--max-subdomains` | 16 | Maximum subdomain count |
+| `--qoi` | point | Quantity of interest: `point` or `average` |
+| `--qoi-location` | 0.5 | Point-QoI location, relative in `[0, 1]` |
+| `--n-modes` | 10 | Fourier modes per dimension |
+| `--n-quadrature` | 100 | Quadrature points per dimension |
 
 ## Next Steps
 
 - [Theory: PINNs](/docs/theory/pinns) - Understand the collocation method
 - [Theory: DFR](/docs/theory/dfr) - Learn about the variational approach
-- [Our Research](/docs/preprint) - Adaptive hp-DFR methods
+- [Our Research](/docs/preprint) - Goal-Oriented DFR
 - [API Reference](/docs/api/pytorch) - Full API documentation

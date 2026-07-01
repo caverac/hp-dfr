@@ -40,29 +40,32 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Adaptive Fourier Mode Selection',
+    title: 'Target a quantity of interest',
     description: (
       <>
-        Dynamically select Fourier modes based on their contribution to the
-        residual norm, reducing complexity from O(N^d) to O(N log N).
+        Instead of minimizing a global error, weight the Deep Fourier Residual
+        loss toward what you actually care about &mdash; a point value, an
+        average, or a flux &mdash; using a dual-weighted residual.
       </>
     ),
   },
   {
-    title: 'hp-Refinement',
+    title: 'A provable error bound',
     description: (
       <>
-        Hierarchical neural network architecture combining domain partitioning
-        (h-refinement) with adaptive network depth/width (p-refinement).
+        A theorem shows the goal-oriented loss controls the error in the quantity
+        of interest, the way the original DFR loss controls the energy-norm error.
+        The bound is fully computable during training.
       </>
     ),
   },
   {
-    title: 'Goal-Oriented Error Estimation',
+    title: 'An honest benchmark',
     description: (
       <>
-        Dual-weighted residuals focus computational effort on quantities of
-        interest, directly targeting what matters for your application.
+        Every figure is reproducible from a single command. We report what the
+        experiments actually show in 1D and 2D &mdash; including where the method
+        helps and where it does not.
       </>
     ),
   },
@@ -98,7 +101,7 @@ export default function Home(): JSX.Element {
   return (
     <Layout
       title={`${siteConfig.title}`}
-      description="Adaptive hp-refinement and goal-oriented error estimation for Deep Fourier Residual methods">
+      description="Goal-oriented error control for Deep Fourier Residual methods">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

@@ -500,8 +500,11 @@ class GoalOrientedDFRModel(BaseModel):
                 weak_residual_z = adjoint_rhs_t + laplacian_z
 
                 # Goal-oriented loss: |<R(u), z>| = |int (f + Delta u) z dx|.
+                # The adjoint is held fixed here (stop_gradient) so the goal term
+                # drives only the primal network; the adjoint is trained solely by
+                # its own residual below. See the PyTorch path for the rationale.
                 z_flat = tf.reshape(z, [-1])
-                go_loss = tf.abs(tf.reduce_sum(weak_residual_u * z_flat) * quad_weight)
+                go_loss = tf.abs(tf.reduce_sum(weak_residual_u * tf.stop_gradient(z_flat)) * quad_weight)
 
                 # DFR regularization: H^{-1} dual norm of each weak residual.
                 ft_primal = tf.linalg.matvec(dst_matrix, weak_residual_u) * weights
@@ -636,8 +639,13 @@ class GoalOrientedDFRModel(BaseModel):
             weak_residual_z = adjoint_rhs_t + laplacian_z
 
             # Goal-oriented loss: |<R(u), z>| = |int (f + Delta u) z dx|.
+            # The adjoint is detached here so the goal term drives only the primal
+            # network: it makes u reduce the residual where the (independently
+            # trained) adjoint is large. Without this, minimizing the pairing over
+            # the adjoint parameters lets z go orthogonal to the residual -- the
+            # pairing collapses to ~0 without the adjoint solving its own problem.
             z_flat = z.reshape(-1)
-            go_loss = torch.abs(torch.sum(weak_residual_u * z_flat) * quad_weight)
+            go_loss = torch.abs(torch.sum(weak_residual_u * z_flat.detach()) * quad_weight)
 
             # DFR regularization: H^{-1} dual norm of each weak residual.
             ft_primal = torch.mv(dst_matrix, weak_residual_u) * weights
@@ -804,8 +812,8 @@ class GoalOrientedDFRModel(BaseModel):
 
     def summary(self) -> None:
         """Print model summary."""
-        console.print("Goal-Oriented DFR Model", markup=False)
-        console.print(f"  Dimension: {self.dim}", markup=False)
-        console.print(f"  QoI: {type(self.qoi).__name__ if self.qoi else 'Not set'}", markup=False)
-        console.print(f"  Network: {self.hidden_layers}", markup=False)
-        console.print(f"  Fourier modes per dim: {self.n_modes}", markup=False)
+        console.print("Goal-Oriented DFR Model", markup=False, highlight=False)
+        console.print(f"  Dimension: {self.dim}", markup=False, highlight=False)
+        console.print(f"  QoI: {type(self.qoi).__name__ if self.qoi else 'Not set'}", markup=False, highlight=False)
+        console.print(f"  Network: {self.hidden_layers}", markup=False, highlight=False)
+        console.print(f"  Fourier modes per dim: {self.n_modes}", markup=False, highlight=False)
