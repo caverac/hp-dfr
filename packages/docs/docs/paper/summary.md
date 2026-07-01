@@ -44,10 +44,11 @@ This means minimizing the dual norm loss is equivalent to minimizing the error.
 For rectangular domains, the $H^{-1}$ norm can be computed efficiently using:
 
 $$
-\|R\|_{H^{-1}}^2 = \sum_{k} \frac{\hat{R}_k^2}{1 + |k|^2}
+\|R\|_{H^{-1}}^2 = \sum_{k} \frac{\hat{R}_k^2}{\lambda_k}, \qquad \lambda_k = \sum_i \left(\frac{\pi k_i}{L_i}\right)^2
 $$
 
-where $\hat{R}_k$ are Fourier coefficients obtained via DST/DCT.
+where $\hat{R}_k$ are the sine coefficients obtained via DST/DCT and $\lambda_k$ are the
+eigenvalues of the Dirichlet Laplacian.
 
 ### 3. Improved Training Correlation
 
@@ -86,24 +87,6 @@ The paper demonstrates strong correlation between the DFR loss and $H^1$ error d
 
 - **PDE**: 2D Poisson on $[0,1]^2$
 - **Result**: DFR scales to higher dimensions
-
-## Numerical Results
-
-### Loss-Error Correlation
-
-| Method     | Correlation (Smooth) | Correlation (Singular) |
-| ---------- | -------------------- | ---------------------- |
-| PINNs (L2) | 0.85                 | 0.40                   |
-| VPINNs     | 0.88                 | 0.55                   |
-| DFR (H⁻¹)  | **0.99**             | **0.98**               |
-
-### Final H1 Errors (Arctan Problem)
-
-| Method | H1 Error   |
-| ------ | ---------- |
-| PINNs  | 2.3e-1     |
-| VPINNs | 1.8e-1     |
-| DFR    | **4.2e-3** |
 
 ## Method Comparison
 
