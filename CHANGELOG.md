@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/caverac/hp-dfr/compare/v1.0.1...v1.0.2) (2026-07-01)
+
+### Bug Fixes
+
+- **preprint:** added submission rule ([833658a](https://github.com/caverac/hp-dfr/commit/833658a2fd2db200d924cb53b7147fd07fae8f8c))
+
 ## [1.0.1](https://github.com/caverac/hp-dfr/compare/v1.0.0...v1.0.1) (2026-07-01)
 
 ### Bug Fixes
