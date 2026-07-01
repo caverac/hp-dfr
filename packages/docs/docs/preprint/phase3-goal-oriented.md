@@ -3,6 +3,8 @@ sidebar_position: 3
 sidebar_label: "Method and Results"
 ---
 
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
 # Goal-Oriented DFR: Method and Results
 
 This page develops the method, states the error guarantee, and presents the 1D and
@@ -126,7 +128,13 @@ seed min&ndash;max.
 The 1D problems are a smooth solution ($u = \sin 2x$) and a sharp one (an $\arctan$
 profile with its gradient concentrated near the center).
 
-![QoI error versus degrees of freedom in 1D, for plain DFR and goal-oriented DFR, on a smooth (top) and a sharp (bottom) problem.](/img/figures/dfr-saturation-1d.png)
+<figure class="scientific">
+  <img src={useBaseUrl('/img/figures/dfr-saturation-1d.png')} alt="QoI error versus degrees of freedom in 1D for plain DFR and goal-oriented DFR" />
+  <figcaption>QoI error versus primal-network degrees of freedom on the 1D Poisson
+  problems (smooth, top; sharp, bottom). Plain DFR reaches its optimization floor at the
+  smallest networks, so goal-orientation offers no advantage. Markers are medians over
+  random seeds; bands span the seed min&ndash;max.</figcaption>
+</figure>
 
 Reproduce with:
 
@@ -158,7 +166,13 @@ effect of goal-orientation. Unlike the 1D problems, a network of practical size 
 not resolve this solution everywhere: plain DFR sits at a QoI error of $10^{-4}$ at
 the smallest networks and only reaches $10^{-5}$ as the width grows.
 
-![QoI error versus degrees of freedom in 2D, for plain DFR and goal-oriented DFR.](/img/figures/dfr-vs-go-2d.png)
+<figure class="scientific">
+  <img src={useBaseUrl('/img/figures/dfr-vs-go-2d.png')} alt="QoI error versus degrees of freedom in 2D for plain DFR and goal-oriented DFR" />
+  <figcaption>QoI error versus primal-network degrees of freedom on the 2D sharp-bump
+  Poisson problem. In this resolution-limited regime goal-oriented DFR improves the
+  point-QoI error by roughly three to five times at matched degrees of freedom. Markers
+  are medians over random seeds; bands span the seed min&ndash;max.</figcaption>
+</figure>
 
 Reproduce with:
 
