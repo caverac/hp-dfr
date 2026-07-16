@@ -1,3 +1,9 @@
+# [1.1.0](https://github.com/caverac/hp-dfr/compare/v1.0.3...v1.1.0) (2026-07-16)
+
+### Features
+
+- bound verification ([c938325](https://github.com/caverac/hp-dfr/commit/c93832565bacd4c70b24c62d92398913768505fa))
+
 ## [1.0.3](https://github.com/caverac/hp-dfr/compare/v1.0.2...v1.0.3) (2026-07-01)
 
 ### Bug Fixes
