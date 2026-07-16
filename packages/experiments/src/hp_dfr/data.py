@@ -1,8 +1,16 @@
 """Sweep-data generation for the goal-oriented DFR preprint figures.
 
-Trains plain DFR and goal-oriented DFR at matched degrees of freedom across a
-range of network widths and several random seeds, recording the error in a point
-quantity of interest for each run. Two sweeps are provided:
+Trains plain DFR and goal-oriented DFR at matched primal-network degrees of
+freedom across a range of network widths and several random seeds, recording the
+error in a point quantity of interest for each run. Goal-oriented runs also record
+the three terms of the QoI error bound (:func:`_go_diagnostics`), so the bound can
+be checked against the error it claims to control rather than only asserted.
+
+Note that goal-oriented runs train a second network of the same size, so they carry
+roughly twice the parameters and twice the per-step cost of the baseline at the
+same recorded ``dof``, which counts the primal network alone.
+
+Two sweeps are provided:
 
 - :func:`run_1d_sweep` -- two 1D Poisson problems (smooth ``sine`` and sharp
   ``arctan``); writes ``m2_1d_data.json``.
@@ -43,6 +51,11 @@ _ARCHS_1D: list[tuple[int, ...]] = [(4, 4), (8, 8), (16, 16), (32, 32)]
 _SEEDS_1D = [0, 1, 2]
 _MODES_1D, _NQ_1D, _ADAM_1D, _LR_1D, _LBFGS_1D = 60, 150, 2000, 2e-3, 400
 _SIGMA_1D = 0.04
+# The 1D control is run at both its own loss weight and the weight used by the 2D
+# sweep (:data:`_PRIM_W_2D`). Running only the former would confound the 1D/2D
+# comparison: a 1D null result at weight 1.0 cannot rule out that the 2D gain
+# comes from the weight rather than from the dimension.
+_PRIM_WS_1D: list[float] = [1.0, 5.0]
 _OUT_1D = FIG_DIR / "m2_1d_data.json"
 
 # --- 2D sweep configuration ------------------------------------------------
@@ -60,6 +73,40 @@ def _n_params(arch: tuple[int, ...], dim: int) -> int:
     """Trainable-parameter count of a fully connected ``dim -> arch -> 1`` net."""
     sizes = [dim, *arch, 1]
     return sum(sizes[i] * sizes[i + 1] + sizes[i + 1] for i in range(len(sizes) - 1))
+
+
+def _go_diagnostics(model: GoalOrientedDFRModel) -> dict[str, float]:
+    """Extract the three terms of the QoI error bound from a trained model.
+
+    The bound is ``|J(u*) - J(u_h)| <= L_QoI + ||R(u_h)|| ||R*(z_h)|| / gamma``,
+    with ``gamma = 1`` for the symmetric coercive Poisson problem. Recording
+    these alongside the true QoI error is what makes the bound checkable rather
+    than merely stated: the estimator is computed every training step anyway.
+
+    The history stores the *squared* dual norms, so the norms are their square
+    roots. Values are taken from the last entry, which is written after the
+    LBFGS polish.
+
+    Parameters
+    ----------
+    model
+        A trained goal-oriented model.
+
+    Returns
+    -------
+    dict[str, float]
+        The goal term, the two dual-norm residuals, and the resulting bound.
+    """
+    history = model.history
+    goal_term = float(history["go_loss"][-1])
+    res_primal = float(np.sqrt(history["primal_loss"][-1]))
+    res_adjoint = float(np.sqrt(history["adjoint_loss"][-1]))
+    return {
+        "go_est": goal_term,
+        "go_res_primal": res_primal,
+        "go_res_adjoint": res_adjoint,
+        "go_bound": goal_term + res_primal * res_adjoint,
+    }
 
 
 def run_1d_sweep(backend: BackendType = "pytorch") -> Path:
@@ -92,28 +139,45 @@ def run_1d_sweep(backend: BackendType = "pytorch") -> Path:
         for arch in _ARCHS_1D:
             dof = _n_params(arch, dim=1)
             for seed in _SEEDS_1D:
+                # The baseline does not depend on the goal-oriented loss weight,
+                # and is deterministic given the seed, so it is trained once and
+                # reused across the weights compared below.
                 dfr = DFRModel(hidden_layers=arch, n_fourier_modes=_MODES_1D, n_quadrature=_NQ_1D, backend=backend, seed=seed)
                 dfr.build()
                 dfr.fit(prob, epochs=_ADAM_1D, learning_rate=_LR_1D, verbose=False, lbfgs_iters=_LBFGS_1D)
                 dfr_q = qoi_err(dfr.predict(xg))
 
-                go = GoalOrientedDFRModel(
-                    hidden_layers=arch,
-                    dim=1,
-                    qoi=qoi,
-                    n_modes=_MODES_1D,
-                    n_quadrature=_NQ_1D,
-                    adjoint_weight=1.0,
-                    primal_weight=1.0,
-                    backend=backend,
-                    seed=seed,
-                )
-                go.build()
-                go.fit(prob, epochs=_ADAM_1D, learning_rate=_LR_1D, verbose=False, lbfgs_iters=_LBFGS_1D)
-                go_q = qoi_err(go.predict(xg))
+                for primal_weight in _PRIM_WS_1D:
+                    go = GoalOrientedDFRModel(
+                        hidden_layers=arch,
+                        dim=1,
+                        qoi=qoi,
+                        n_modes=_MODES_1D,
+                        n_quadrature=_NQ_1D,
+                        adjoint_weight=1.0,
+                        primal_weight=primal_weight,
+                        backend=backend,
+                        seed=seed,
+                    )
+                    go.build()
+                    go.fit(prob, epochs=_ADAM_1D, learning_rate=_LR_1D, verbose=False, lbfgs_iters=_LBFGS_1D)
+                    go_q = qoi_err(go.predict(xg))
 
-                records.append({"problem": pname, "dof": dof, "seed": seed, "dfr_qoi": dfr_q, "go_qoi": go_q})
-                console.print(f"{pname:8s} dof={dof:4d} seed={seed} | DFR={dfr_q:.2e} GO={go_q:.2e}", markup=False)
+                    records.append(
+                        {
+                            "problem": pname,
+                            "dof": dof,
+                            "seed": seed,
+                            "primal_weight": primal_weight,
+                            "dfr_qoi": dfr_q,
+                            "go_qoi": go_q,
+                            **_go_diagnostics(go),
+                        }
+                    )
+                    console.print(
+                        f"{pname:8s} dof={dof:4d} seed={seed} pw={primal_weight:.1f} | DFR={dfr_q:.2e} GO={go_q:.2e}",
+                        markup=False,
+                    )
 
     _OUT_1D.write_text(json.dumps(records, indent=2), encoding="utf-8")
     console.print(f"wrote {_OUT_1D}", markup=False)
@@ -174,7 +238,17 @@ def run_2d_sweep(backend: BackendType = "pytorch") -> Path:
             go.fit(prob, epochs=_ADAM_2D, learning_rate=_LR_2D, verbose=False, lbfgs_iters=_LBFGS_2D)
             go_q = qoi_err(go.predict(pts))
 
-            records.append({"problem": "arctanbump2d", "dof": dof, "seed": seed, "dfr_qoi": dfr_q, "go_qoi": go_q})
+            records.append(
+                {
+                    "problem": "arctanbump2d",
+                    "dof": dof,
+                    "seed": seed,
+                    "primal_weight": _PRIM_W_2D,
+                    "dfr_qoi": dfr_q,
+                    "go_qoi": go_q,
+                    **_go_diagnostics(go),
+                }
+            )
             console.print(f"dof={dof:4d} seed={seed} | DFR={dfr_q:.2e} GO={go_q:.2e}", markup=False)
 
     _OUT_2D.write_text(json.dumps(records, indent=2), encoding="utf-8")

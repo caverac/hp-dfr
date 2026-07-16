@@ -26,26 +26,36 @@ $$
 $$
 
 while the adjoint network is trained on its own residual so that it approximates the
-true adjoint. The central result is a goal-oriented analogue of the DFR error-loss
-equivalence: under the standard well-posedness (Banach-Necas-Babuska) hypotheses, with
-inf-sup constant $\gamma$,
+true adjoint. The central result is a goal-oriented counterpart of the DFR error-loss
+equivalence, one-sided rather than an equivalence: under the standard well-posedness
+(Banach-Necas-Babuska) hypotheses, with inf-sup constant $\gamma$,
 
 $$
 \bigl| J(u) - J(u_h) \bigr| \;\le\; \mathcal{L}_{\mathrm{QoI}}(u_h, z_h) \;+\; \frac{1}{\gamma}\, \lVert R(u_h) \rVert_{V^\ast}\, \lVert R^\ast(z_h) \rVert_{U^\ast},
 $$
 
-and every term on the right is computed during training.
+and every term on the right is computed during training. Measured across all 60
+goal-oriented runs, the bound holds every time, at a median of ten times the true error.
+The loss $\mathcal{L}_{\mathrm{QoI}}$ alone is **not** an error estimator, though: training
+minimizes it directly, driving it some five orders of magnitude below the error that
+remains, so the bound is carried by its remainder.
 
 ## Main result
 
-Goal-orientation helps exactly where the second-order structure of the bound predicts
--- when the network is resolution-limited.
+Goal-orientation helps when the network is resolution-limited, and not otherwise. The
+theory is consistent with this but does not predict it: the bound's remainder is small only
+when both networks are well resolved, which is what fails in the regime where the gain
+appears.
 
 - **1D Poisson (control):** plain DFR already reaches its optimization floor
-  (error $\sim 10^{-5}$) at the smallest networks, so there is nothing to gain.
-- **2D Poisson, sharp feature:** a network of practical size cannot resolve the
-  solution everywhere, and goal-orientation reduces the point-QoI error by roughly
-  **three to five times** at matched degrees of freedom.
+  (error $\sim 3\times 10^{-5}$) at the smallest networks, so there is nothing to
+  gain. This holds at both loss weightings tried, which rules out the weight as
+  the explanation for the 2D result below.
+- **2D Poisson, peaked feature:** a network of the same size does not resolve the
+  solution everywhere, and goal-orientation reduces the median point-QoI error by
+  **1.2 to 5.3 times** (2.7 times on a geometric mean) at matched primal-network
+  degrees of freedom, winning ten of twelve runs. Note the goal-oriented method
+  trains a second network of equal size, so it carries about twice the parameters.
 
 The figures, numbers, and reproduction commands are in the
 [documentation](https://caverac.github.io/hp-dfr/docs/preprint/phase3-goal-oriented#results).
@@ -78,9 +88,8 @@ uv run hp-dfr --help
 Reproduce the paper figures (generate the sweep data, then render):
 
 ```bash
-KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_1d_data.py
-KERAS_BACKEND=torch uv run python packages/experiments/scripts/gen_2d_data.py
-uv run hp-dfr figures
+uv run hp-dfr data all   # both sweeps; about 20 minutes on a laptop CPU
+uv run hp-dfr figures    # renders the three figures from the saved JSON
 ```
 
 Run the documentation site locally:

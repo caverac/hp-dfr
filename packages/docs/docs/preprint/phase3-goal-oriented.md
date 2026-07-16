@@ -76,10 +76,12 @@ penalty is needed.
 
 ## The guarantee
 
-The central result is a goal-oriented analogue of the DFR error&ndash;loss
+The central result is a goal-oriented counterpart of the DFR error&ndash;loss
 equivalence, under the standard well-posedness hypotheses (the
 Banach&ndash;Necas&ndash;Babuska conditions: a boundedness constant $M$ and an
-inf&ndash;sup constant $\gamma$).
+inf&ndash;sup constant $\gamma$). It is one-sided: a reliability bound, not an
+equivalence. No lower bound holds, since an adjoint far from $z^*$ makes the loss
+positive while the QoI error may vanish.
 
 **Exact error representation (Proposition 4.2).** For any primal $u_h$ and adjoint
 $z_h$,
@@ -108,32 +110,51 @@ residual, and the adjoint DFR residual. The bound is therefore computable a
 posteriori, without the true solution.
 
 The remainder is a _product_ of the primal and adjoint residuals. If both are trained
-to size $\delta$, the goal loss estimates the QoI error to $O(\delta^2)$. This
-second-order structure has a direct consequence for the experiments: when the primal
-residual is already at its floor, the remainder is negligible and goal-orientation
-cannot improve the QoI; when the primal residual cannot be made uniformly small, the
-remainder is significant and goal-orientation reallocates the network's capacity
-toward the QoI. The next section shows both regimes.
+to size $\delta$, the remainder is $O(\delta^2)$. Three qualifications matter, because
+the natural reading of that sentence overreaches on all three.
+
+First, the $O(\delta^2)$ statement presupposes $\delta$ is small, that is, that both
+networks are well resolved. It says nothing about a resolution-limited regime, where
+$\delta$ is not small and the bound is correspondingly weak. The bound is weakest
+exactly where goal-orientation turns out to help.
+
+Second, the classical second-order gain rests on Galerkin orthogonality, which has no
+counterpart here. Minimizing the goal loss enforces a single scalar condition in its
+place, which is enough for the error representation to reduce to the remainder, but is
+a far weaker constraint and is satisfiable without $u_h$ being accurate.
+
+Third, the goal loss is therefore **not** an error estimator for a network trained on
+it. Training minimizes it directly, so it lands near $10^{-10}$ while the true QoI
+error sits near $10^{-4}$. The useful computable object is the whole right-hand side of
+the bound, which is carried by the remainder. Measured across all runs, that bound
+holds every time, at a median of ten times the true error.
+
+The next section shows both regimes.
 
 ## Results
 
-The comparison against plain DFR is at matched degrees of freedom (the same
-primal-network architecture for both), sweeping the network width and repeating over
-random seeds. The metric is the error in a mollified point QoI,
+The comparison against plain DFR is at matched primal-network degrees of freedom
+(the same primal-network architecture for both), sweeping the network width and
+repeating over three random seeds. The goal-oriented method also trains an adjoint
+network of the same size, so it carries about twice the parameters and twice the
+per-step cost at a given abscissa; the adjoint is auxiliary and discarded once the
+primal is trained. The metric is the error in a mollified point QoI,
 $|J_\sigma(u_h) - J_\sigma(u^*)|$; markers are medians over seeds and bands span the
 seed min&ndash;max.
 
 ### One dimension: no advantage
 
-The 1D problems are a smooth solution ($u = \sin 2x$) and a sharp one (an $\arctan$
+The 1D problems are a smooth solution ($u = \sin 2x$) and a peaked one (an $\arctan$
 profile with its gradient concentrated near the center).
 
 <figure class="scientific">
   <img src={useBaseUrl('/img/figures/dfr-saturation-1d.png')} alt="QoI error versus degrees of freedom in 1D for plain DFR and goal-oriented DFR" />
   <figcaption>QoI error versus primal-network degrees of freedom on the 1D Poisson
-  problems (smooth, top; sharp, bottom). Plain DFR reaches its optimization floor at the
-  smallest networks, so goal-orientation offers no advantage. Markers are medians over
-  random seeds; bands span the seed min&ndash;max.</figcaption>
+  problems (smooth, top; peaked, bottom). Plain DFR reaches its optimization floor
+  (about $3\times 10^{-5}$) at the smallest networks, so goal-orientation offers no
+  advantage &mdash; at either loss weight, including the one the 2D experiments use,
+  which rules out the weight as the explanation for the 2D result. Markers are medians
+  over random seeds; bands span the seed min&ndash;max.</figcaption>
 </figure>
 
 Reproduce with:
@@ -168,10 +189,11 @@ the smallest networks and only reaches $10^{-5}$ as the width grows.
 
 <figure class="scientific">
   <img src={useBaseUrl('/img/figures/dfr-vs-go-2d.png')} alt="QoI error versus degrees of freedom in 2D for plain DFR and goal-oriented DFR" />
-  <figcaption>QoI error versus primal-network degrees of freedom on the 2D sharp-bump
+  <figcaption>QoI error versus primal-network degrees of freedom on the 2D arctan-bump
   Poisson problem. In this resolution-limited regime goal-oriented DFR improves the
-  point-QoI error by roughly three to five times at matched degrees of freedom. Markers
-  are medians over random seeds; bands span the seed min&ndash;max.</figcaption>
+  median point-QoI error by 1.2 to 5.3 times (2.7 times on a geometric mean) at matched
+  primal-network degrees of freedom, winning ten of twelve runs. Markers are medians
+  over random seeds; bands span the seed min&ndash;max.</figcaption>
 </figure>
 
 Reproduce with:
@@ -188,8 +210,10 @@ The first command writes `assets/m3_2d_data.json`; the second reads it and write
 `assets/dfr-vs-go-2d.png` and `.pdf`.
 
 In this resolution-limited regime goal-orientation is the more accurate method at
-almost every size, improving the median QoI error by roughly three to five times and
-winning on ten of the twelve configurations:
+every size, improving the median QoI error by 1.2 to 5.3 times (a geometric mean of
+2.7) and winning on ten of the twelve configurations. Neither method is monotone in
+the degrees of freedom, and the near-parity at 337 reflects the goal-oriented method
+degrading rather than the baseline improving:
 
 | Degrees of freedom |          Plain DFR |      Goal-oriented | Improvement |
 | -----------------: | -----------------: | -----------------: | ----------: |
@@ -199,19 +223,61 @@ winning on ten of the twelve configurations:
 |               1185 | $1.0\times10^{-5}$ | $3.2\times10^{-6}$ | $3.1\times$ |
 
 The advantage is largest at the smallest network, where plain DFR is most starved of
-resolution, and persists at the larger sizes as the adjoint network becomes well
-resolved. The two methods are comparable only at the intermediate size, where plain
-DFR happens to resolve the bump particularly well.
+resolution. Neither method is monotone in the degrees of freedom, and the near-parity at
+337 is not the baseline doing unusually well &mdash; there plain DFR is in fact twice
+worse than at 697. What narrows the gap is goal-orientation degrading. With three seeds
+and a seed-to-seed spread reaching a factor of fifty at that size, we do not read the
+337 column as evidence of a mechanism.
+
+### Does the bound hold, and is the loss an estimator?
+
+Every term of the bound is computed at each training step, so it can be checked rather
+than assumed. Recording all three at the end of each of the 60 goal-oriented runs gives
+two findings that pull in opposite directions.
+
+<figure class="scientific">
+  <img src={useBaseUrl('/img/figures/bound-verification.png')} alt="The QoI error bound and the goal term plotted against the true QoI error" />
+  <figcaption>The bound and the goal term against the QoI error actually committed (1D,
+  top; 2D, bottom); the dashed diagonal is equality. The bound (circles) holds on every
+  one of the 60 runs, exceeding the true error by a median factor of 9.8 in 1D and 17.7
+  in 2D. The goal term alone (squares) lies about five orders of magnitude
+  <em>below</em> the error it is supposed to estimate.</figcaption>
+</figure>
+
+Reproduce with `uv run hp-dfr data all` followed by `uv run hp-dfr figures`.
+
+**The bound holds, and is usefully tight.** No violation on any run, despite the dual
+norms being evaluated on truncated spectral sums that underestimate the true norms. It
+exceeds the true error by a median factor of 9.8 (1D) and 17.7 (2D). Within an order of
+magnitude, and never optimistic, is a useful a posteriori bound.
+
+**The goal loss is not an error estimator.** Across the runs it has a median value of
+$2\times 10^{-10}$ against a median QoI error near $10^{-5}$, and never once exceeds
+the error. Training minimizes it directly, and being a single scalar condition it is
+driven to zero without $u_h$ becoming accurate. Reporting it as an error estimate would
+understate the error by five orders of magnitude; the quantity to use is the whole
+right-hand side of the bound, which the remainder carries. This is a general hazard of
+training on an a posteriori quantity: any residual functional that appears in the loss
+is disqualified from also estimating what the loss failed to remove.
 
 ### Why the two regimes differ
 
-The contrast follows from the second-order remainder in Theorem 4.3. When plain DFR
-already drives the primal residual to its floor (1D), the remainder is negligible and
-there is no error to reallocate; the extra adjoint network only complicates the
-optimization. When the primal residual cannot be made uniformly small at feasible
-cost (2D), the goal-oriented objective spends the network's limited capacity where
-the adjoint indicates it matters for the QoI, and the several-fold accuracy gain
-follows. Goal-orientation is a tool for the resolution-limited regime.
+The qualitative shape of the contrast is the one Theorem 4.3 suggests. When plain DFR
+already drives the primal residual to its floor (1D), there is no error to reallocate;
+the extra adjoint network only complicates the optimization. When the primal residual
+cannot be made uniformly small at feasible cost (2D), the goal-oriented objective
+spends the network's limited capacity where the adjoint indicates it matters for the
+QoI. Goal-orientation is a tool for the resolution-limited regime.
+
+The theorem does not, however, _predict_ the 2D gain: its remainder is small only when
+both networks are well resolved, which is what fails in the regime where the gain
+appears. The result is consistent with the theory and unexplained by it. Nor is the
+contrast explained by the solution or the discretization: the same $k = 8$ profile
+underlies both settings, 16 modes capture it to a fraction $10^{-7}$, the largest 1D
+and 2D networks are within three percent of each other in parameter count, and the 1D
+control run at the 2D loss weight reaches the same conclusion. What differs is the
+dimension, which is an optimization statement rather than an approximation-theoretic
+one.
 
 Two implementation points are necessary to observe this behavior: the adjoint must be
 trained on its own residual and held fixed in the goal term, and in two dimensions the

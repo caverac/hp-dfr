@@ -76,19 +76,23 @@ to a value that makes the pairing vanish.
 
 The method rests on two results, one theoretical and one empirical.
 
-The theorem is a goal-oriented analogue of the DFR guarantee: the QoI-weighted loss,
+The theorem is a goal-oriented counterpart of the DFR guarantee: the QoI-weighted loss,
 together with a computable remainder, bounds the error in the quantity of interest,
-and every term of the bound is available during training. The remainder is a
-_product_ of the primal and adjoint residuals, which is the source of the empirical
-behavior below.
+and every term of the bound is available during training. Unlike the DFR guarantee it is
+one-sided. The remainder is a _product_ of the primal and adjoint residuals, and it is
+small only when both networks are well resolved, so the bound is weakest in the very
+regime where goal-orientation turns out to help. Measured across all 60 goal-oriented
+runs the bound holds every time, at a median of ten times the true error, but the loss
+alone is not an error estimator: training drives it about five orders of magnitude below
+the error that remains.
 
 The experiments locate where goal-orientation helps. On 1D Poisson problems, plain
-DFR reaches its optimization floor (an error of order $10^{-5}$) at very small
-networks; the solution is already accurate everywhere, the remainder is negligible,
-and goal-orientation offers no advantage. On a 2D problem with a sharp feature, a
-network of practical size cannot resolve the solution everywhere, the remainder is
-no longer negligible, and goal-orientation reduces the QoI error by roughly three to
-five times at matched degrees of freedom. The [results](/docs/preprint/phase3-goal-oriented#results)
+DFR reaches its optimization floor (an error of order $3\times 10^{-5}$) at very
+small networks; the solution is already accurate everywhere and goal-orientation
+offers no advantage, at either loss weighting tried. On a 2D problem with a peaked
+feature, a network of the same size does not resolve the solution everywhere, and
+goal-orientation reduces the median QoI error by 1.2 to 5.3 times at matched
+primal-network degrees of freedom. The [results](/docs/preprint/phase3-goal-oriented#results)
 present both cases, with the command that reproduces each figure.
 
 ## Scope

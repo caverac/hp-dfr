@@ -117,7 +117,9 @@ class DFRModel(BaseModel):
         h = np.abs(pts[1:] - pts[:-1])
         self._quadrature_pts = pts[:-1] + h / 2
 
-        # H^-1 norm weights: (1 + k^2 * pi^2 / L^2)^-0.5
+        # Dual-norm weights lambda_k^-0.5 for the energy inner product on H^1_0,
+        # so lambda_k = (k pi / L)^2 with no additive constant. The full H^1 inner
+        # product would instead give lambda_k = 1 + (k pi / L)^2.
         k = np.arange(1, self.n_fourier_modes + 1)
         self._h_minus_1_weights = ((np.pi**2 * k**2) / L**2) ** -0.5
 

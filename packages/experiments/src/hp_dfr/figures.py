@@ -41,12 +41,21 @@ def _load(name: str) -> list[Record]:
     return records
 
 
-def _median_band(records: list[Record], problem: str, key: str) -> MedianBand:
-    """Return (dofs, median, lo, hi) over seeds for one method/problem."""
+def _median_band(records: list[Record], problem: str, key: str, primal_weight: float | None = None) -> MedianBand:
+    """Return (dofs, median, lo, hi) over seeds for one method/problem.
+
+    ``primal_weight`` selects one goal-oriented loss weight. The 1D sweep records
+    several, so omitting it would pool distinct configurations into one band.
+    """
     by_dof: dict[int, list[float]] = defaultdict(list)
     for r in records:
-        if r["problem"] == problem:
-            by_dof[cast(int, r["dof"])].append(cast(float, r[key]))
+        if r["problem"] != problem:
+            continue
+        if primal_weight is not None and r.get("primal_weight") != primal_weight:
+            continue
+        by_dof[cast(int, r["dof"])].append(cast(float, r[key]))
+    if not by_dof:
+        raise ValueError(f"no records for problem={problem!r} primal_weight={primal_weight!r}")
     dofs = sorted(by_dof)
     med = np.array([np.median(by_dof[d]) for d in dofs])
     lo = np.array([np.min(by_dof[d]) for d in dofs])
@@ -59,16 +68,23 @@ def figure_dfr_saturation_1d() -> Figure:
     r"""Plot the QoI error versus degrees of freedom for both methods.
 
     On both a smooth (sine) and a sharp (arctan) 1D Poisson problem, plain DFR
-    reaches its accuracy floor (~1e-5) already at the smallest network sizes, so
-    there is no resolution-limited regime for goal-orientation to exploit; the
-    goal-oriented variant is uniformly less accurate on the quantity of interest.
+    reaches its accuracy floor (~3e-5) already at the smallest network sizes, so
+    there is no resolution-limited regime for goal-orientation to exploit. The
+    goal-oriented variant is less accurate at small and moderate sizes and
+    catches up only at the largest.
+
+    Both goal-oriented loss weights are shown: the 1D value and the value the 2D
+    sweep uses. The 2D weight does not rescue goal-orientation here, which is
+    what rules out the weight as the explanation for the 2D result.
+
     Markers are medians over seeds; bands span the seed min--max.
     """
     records = _load("m2_1d_data.json")
-    panels = [("sine", "smooth (sine)"), ("arctan8", r"sharp (arctan, $k=8$)")]
+    panels = [("sine", "smooth (sine)"), ("arctan8", r"peaked (arctan, $k=8$)")]
     styles = [
-        ("dfr_qoi", "-", "o", "DFR"),
-        ("go_qoi", "--", "s", "Goal-Oriented DFR"),
+        ("dfr_qoi", 1.0, "-", "o", "DFR"),
+        ("go_qoi", 1.0, "--", "s", r"GO-DFR ($\alpha=\beta=1$)"),
+        ("go_qoi", 5.0, "-.", "^", r"GO-DFR ($\alpha=\beta=5$)"),
     ]
 
     fig = Figure(figsize=(5.4, 6.2))
@@ -77,8 +93,8 @@ def figure_dfr_saturation_1d() -> Figure:
     axlist = [top, bot]
     for i, (prob, panel_label) in enumerate(panels):
         ax = axlist[i]
-        for key, ls, marker, label in styles:
-            dofs, med, lo, hi = _median_band(records, prob, key)
+        for key, weight, ls, marker, label in styles:
+            dofs, med, lo, hi = _median_band(records, prob, key, primal_weight=weight)
             ax.fill_between(dofs, lo, hi, color="0.6", alpha=0.25, linewidth=0)
             ax.plot(
                 dofs, med, color="black", linestyle=ls, marker=marker, linewidth=1.6, markersize=6, markerfacecolor="white", label=label
@@ -98,11 +114,11 @@ def figure_dfr_saturation_1d() -> Figure:
 def figure_dfr_vs_go_2d() -> Figure:
     r"""Plot the QoI error versus degrees of freedom for both methods in 2D.
 
-    On the 2D Poisson problem with a sharp arctan bump, plain DFR resolves the
-    quantity of interest far more accurately than the goal-oriented variant at
-    every matched network size: the second adjoint network and the non-smooth
-    goal term make the goal-oriented optimization harder without buying QoI
-    accuracy. Markers are medians over seeds; bands span the seed min--max.
+    On the 2D Poisson problem with an arctan bump, goal-orientation is the more
+    accurate method at all but one of the swept sizes, winning ten of the twelve
+    runs and improving the median QoI error by 1.2x to 5.3x (2.7x on a geometric
+    mean) at matched primal-network degrees of freedom. Markers are medians over
+    seeds; bands span the seed min--max.
     """
     records = _load("m3_2d_data.json")
     styles = [
@@ -124,7 +140,60 @@ def figure_dfr_vs_go_2d() -> Figure:
     return fig
 
 
+@figure("bound-verification")
+def figure_bound_verification() -> Figure:
+    r"""Plot the QoI error bound and the goal term against the true QoI error.
+
+    Each marker is one goal-oriented run. The dashed diagonal is equality, so a
+    valid bound lies above it. The bound holds on every run at roughly ten times
+    the true error, while the goal term alone lies about five orders of magnitude
+    below it: training minimizes the goal term directly, so it cannot also report
+    the error that remains.
+    """
+    panels = [
+        ("m2_1d_data.json", "1D"),
+        ("m3_2d_data.json", "2D"),
+    ]
+    series = [
+        ("go_bound", "o", r"$\mathcal{L}_{\mathrm{QoI}} + \|R(u_h)\|_{V^*}\|R^*(z_h)\|_{U^*}$"),
+        ("go_est", "s", r"$\mathcal{L}_{\mathrm{QoI}}$"),
+    ]
+
+    fig = Figure(figsize=(5.4, 6.2))
+    top = fig.add_subplot(2, 1, 1)
+    bot = fig.add_subplot(2, 1, 2, sharex=top)
+    for ax, (name, panel_label) in zip([top, bot], panels):
+        records = _load(name)
+        true_err = np.array([cast(float, r["go_qoi"]) for r in records])
+        for key, marker, label in series:
+            ax.plot(
+                true_err,
+                np.array([cast(float, r[key]) for r in records]),
+                linestyle="none",
+                marker=marker,
+                color="black",
+                markersize=5,
+                markerfacecolor="white",
+                label=label,
+            )
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_ylabel(r"$\mathcal{L}_{\mathrm{QoI}}$, bound")
+        ax.text(0.03, 0.93, panel_label, transform=ax.transAxes, ha="left", va="top")
+    bot.set_xlabel(r"$|J_\sigma(u_h) - J_\sigma(u^*)|$")
+    top.tick_params(labelbottom=False)  # x-axis shared with the bottom panel
+    top.legend(loc="center right")
+
+    # Equality, drawn last across the settled limits: a valid bound lies above it.
+    for ax in (top, bot):
+        lo, hi = ax.get_xlim()
+        ax.plot([lo, hi], [lo, hi], linestyle="--", color="0.5", linewidth=1.0, zorder=0)
+        ax.set_xlim(lo, hi)
+    return fig
+
+
 def make_all_figures() -> None:
     """Build and write every preprint figure."""
     figure_dfr_saturation_1d()
     figure_dfr_vs_go_2d()
+    figure_bound_verification()

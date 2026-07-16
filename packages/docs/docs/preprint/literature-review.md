@@ -181,7 +181,7 @@ where $z$ is the adjoint solution and $R$ is the residual.
 
 ### 3.2 Multigoal-Oriented DWR with DNNs (2021-2025)
 
-Chakraborty, Wick, Zhuang, and Rabczuk explored using neural networks to compute adjoints for goal-oriented error estimation.
+Chakraborty, Wick, Rabczuk, and Zhuang explored using neural networks to compute adjoints for goal-oriented error estimation.
 
 **Key Findings**:
 
@@ -196,7 +196,7 @@ Chakraborty, Wick, Zhuang, and Rabczuk explored using neural networks to compute
 - Use error localization for multiple goal functionals
 - Handles nonlinear PDEs and nonlinear goal functionals
 
-**Source**: [Multigoal-oriented dual-weighted-residual error estimation using deep neural networks](https://arxiv.org/abs/2112.11360) (arXiv:2112.11360)
+**Source**: [Multigoal-oriented dual-weighted-residual error estimation using PINNs](https://doi.org/10.1007/s44379-025-00012-4), _Machine Learning for Computational Science and Engineering_ **1**(1):13 (2025); preprint [arXiv:2112.11360](https://arxiv.org/abs/2112.11360)
 
 **Recent Update (2025)**: Published in [Machine Learning for Computational Science and Engineering](https://link.springer.com/article/10.1007/s44379-025-00012-4)
 
@@ -351,7 +351,7 @@ This project focuses on goal-oriented DFR. Two adjacent directions are out of sc
 ### The gap we address: Goal-Oriented DFR
 
 Existing goal-oriented neural methods either use strong-form PINN/Deep Ritz
-losses (Chakraborty-Wick-Zhuang-Rabczuk; Govoeyi-Richter) or classical FEM
+losses (Chakraborty-Wick-Rabczuk-Zhuang; Govoeyi-Richter) or classical FEM
 (Becker-Rannacher). **No work applies the dual-weighted residual to the DFR
 $H^{-1}$ dual-norm loss specifically** - i.e., a QoI-weighted dual-norm residual
 functional $|\langle R(u), z \rangle|$ where the dual norm is computed a la DFR.
@@ -384,7 +384,7 @@ we extend - not claimed as novel.
 
 ### Goal-Oriented Error Estimation
 
-5. Chakraborty, A., Wick, T., Zhuang, X., Rabczuk, T. (2021/2025). Multigoal-oriented dual-weighted-residual error estimation using deep neural networks. [arXiv:2112.11360](https://arxiv.org/abs/2112.11360), DOI 10.1007/s44379-025-00012-4
+5. Chakraborty, A., Wick, T., Rabczuk, T., Zhuang, X. (2025). Multigoal-oriented dual-weighted-residual error estimation using PINNs. _Machine Learning for Computational Science and Engineering_ **1**(1):13. [doi:10.1007/s44379-025-00012-4](https://doi.org/10.1007/s44379-025-00012-4); preprint [arXiv:2112.11360](https://arxiv.org/abs/2112.11360)
 
 6. Kakranian, M., Rasooli, M. (2022). Neural network guided adjoint computations in dual weighted residual error estimation. [Springer](https://link.springer.com/article/10.1007/s42452-022-04938-9)
 

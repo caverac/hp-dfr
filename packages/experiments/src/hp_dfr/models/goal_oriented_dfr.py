@@ -11,12 +11,15 @@ affect the QoI.
 Key Concepts:
     - Primal problem: Lu = f (the original PDE)
     - Adjoint problem: L*z = J' (adjoint with QoI functional derivative)
-    - Error representation: J(u) - J(u_h) ≈ <R(u_h), z>
+    - Error representation: J(u) - J(u_h) = <R(u_h), z>
 
 References:
     - Becker & Rannacher (2001). Optimal control approach to error estimation.
-    - Chakraborty, Wick, Zhuang, Rabczuk (2021). Multigoal-oriented DWR error
-      estimation using deep neural networks. arXiv:2112.11360.
+    - Chakraborty, Wick, Rabczuk, Zhuang (2025). Multigoal-oriented DWR error
+      estimation using PINNs. Machine Learning for Computational Science and
+      Engineering 1(1):13. doi:10.1007/s44379-025-00012-4.
+    - Roth, Schroder, Wick (2022). Neural network guided adjoint computations in
+      dual weighted residual error estimation. SN Applied Sciences 4(2):62.
 """
 
 from __future__ import annotations
@@ -80,7 +83,7 @@ class QuantityOfInterest(ABC):
         """Compute right-hand side for adjoint problem.
 
         The adjoint problem is L*z = J'(u), where J' is the
-        Fréchet derivative of the QoI functional.
+        Frechet derivative of the QoI functional.
 
         Args:
             x: Points at which to evaluate.
@@ -187,7 +190,7 @@ class AverageValueQoI(QuantityOfInterest):
 class BoundaryFluxQoI(QuantityOfInterest):
     """Flux through a boundary segment.
 
-    J(u) = integral_Gamma (grad u · n) ds
+    J(u) = integral_Gamma (grad u . n) ds
 
     where Gamma is a boundary segment and n is the normal.
     """
@@ -795,20 +798,38 @@ class GoalOrientedDFRModel(BaseModel):
 
         return cast(np.ndarray, (cutoff * nn_out).flatten())
 
-    def estimate_qoi_error(self) -> float:
-        """Estimate the QoI error via the goal-oriented loss.
+    def estimate_qoi_error(self, inf_sup_constant: float = 1.0) -> float:
+        """Bound the QoI error by the computable terms of the error-control theorem.
 
-        Returns the most recent value of the computable estimator
-        ``L_QoI = |<R(u_h), z_h>|`` recorded during training. By the QoI
-        error-control theorem this bounds the true QoI error up to the
-        adjoint-approximation remainder.
+        Returns ``L_QoI + ||R(u_h)|| ||R*(z_h)|| / gamma``, the full right-hand
+        side of the bound, evaluated after the last training step.
+
+        The goal term ``L_QoI = |<R(u_h), z_h>|`` alone is *not* an estimate of
+        the QoI error, even though the theorem is often read that way. Training
+        minimizes it directly, and it is a single scalar condition, so the
+        optimizer drives it to roughly ``1e-10`` while the true QoI error remains
+        near ``1e-4``. A quantity that has been minimized to zero cannot measure
+        what error is left; the bound is carried entirely by the remainder term,
+        which is why that term is included here.
+
+        Args:
+            inf_sup_constant: The inf-sup constant ``gamma`` of (A2). Defaults to
+                ``1.0``, its value for the symmetric coercive Poisson problem in
+                the energy norm.
 
         Returns:
-            Estimated QoI error.
+            An upper bound on ``|J(u*) - J(u_h)|``.
+
+        Raises:
+            ValueError: If the model has not been trained yet.
         """
         if not self._history.get("go_loss"):
             raise ValueError("Model not trained yet; call fit() first.")
-        return float(self._history["go_loss"][-1])
+        goal_term = float(self._history["go_loss"][-1])
+        # The history stores the squared dual norms.
+        res_primal = float(np.sqrt(self._history["primal_loss"][-1]))
+        res_adjoint = float(np.sqrt(self._history["adjoint_loss"][-1]))
+        return goal_term + res_primal * res_adjoint / inf_sup_constant
 
     def summary(self) -> None:
         """Print model summary."""

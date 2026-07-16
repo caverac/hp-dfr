@@ -19,7 +19,7 @@ value, an average, or a flux &mdash; goal-oriented DFR weights the loss toward t
 functional. It trains a **primal** network $u_h$ together with an **adjoint** network
 $z_h$ and minimizes a QoI-weighted residual. The construction comes with a theorem
 bounding the QoI error, and the experiments show that it improves QoI accuracy in the
-regime where the theorem predicts it should.
+resolution-limited regime, and not otherwise.
 
 ## Construction
 
@@ -42,12 +42,14 @@ adjoint problem, the error representation, the theorem, and the experiments.
 
 ## The guarantee
 
-The central result is a goal-oriented analogue of the DFR error&ndash;loss
+The central result is a goal-oriented counterpart of the DFR error&ndash;loss
 equivalence. The QoI-weighted loss, plus a remainder built from the primal and
 adjoint residuals, bounds the error in the quantity of interest, and every term of
-the bound is computed during training. The remainder is a product of the two
-residuals; it is small when both networks are accurate, and its size governs when
-goal-orientation is useful. The precise statement is Theorem 4.3, on the
+the bound is computed during training. Unlike the DFR estimate the bound is
+one-sided, and the loss alone is not an error estimator: training drives it far below
+the error that remains, so the bound is carried by its remainder. That remainder is a
+product of the two residuals; it is small only when both networks are accurate, which
+means the bound is weakest in the very regime where goal-orientation proves useful. The precise statement is Theorem 4.3, on the
 [Method and Results](/docs/preprint/phase3-goal-oriented#the-guarantee) page.
 
 ## What the experiments establish
@@ -56,15 +58,17 @@ The comparison against plain DFR is run at matched network sizes on Poisson prob
 in one and two dimensions.
 
 - **1D: no advantage.** Plain DFR reaches its optimization floor (error of order
-  $10^{-5}$) at the smallest networks. The solution is already accurate everywhere,
-  the remainder in the bound is negligible, and goal-orientation offers no
-  improvement. This case is a control: it confirms the method does not report a
-  benefit where none exists.
+  $3\times 10^{-5}$) at the smallest networks. The solution is already accurate
+  everywhere and goal-orientation offers no improvement, at either loss weighting
+  tried, including the one the 2D experiments use. This case is a control: it confirms
+  the method does not report a benefit where none exists, and rules out the loss weight
+  as the explanation for the 2D result.
 
-- **2D: a consistent advantage.** On a problem with a sharp feature, a network of
-  practical size is resolution-limited. Goal-orientation then reduces the point-QoI
-  error by roughly three to five times at matched degrees of freedom, winning on ten
-  of twelve configurations.
+- **2D: an advantage.** On a problem with a peaked feature, a network of the same
+  size is resolution-limited. Goal-orientation then reduces the median point-QoI
+  error by 1.2 to 5.3 times (2.7 times on a geometric mean) at matched
+  primal-network degrees of freedom, winning on ten of twelve configurations. The
+  theory is consistent with this result but does not predict it.
 
 Both cases, with the figures and the exact commands that reproduce them, are on the
 [Method and Results](/docs/preprint/phase3-goal-oriented#results) page.
@@ -105,8 +109,9 @@ out of scope, for reasons of novelty and existing coverage (see
 2. Taylor, J.M., Bastidas, M., Calo, V.M., Pardo, D. (2024). Adaptive Deep Fourier
    Residual method via overlapping domain decomposition. _CMAME_.
    [arXiv:2401.04663](https://arxiv.org/abs/2401.04663)
-3. Chakraborty, A., Wick, T., Zhuang, X., Rabczuk, T. (2021/2025).
-   Multigoal-oriented dual-weighted-residual error estimation using deep neural
-   networks. [arXiv:2112.11360](https://arxiv.org/abs/2112.11360)
+3. Chakraborty, A., Wick, T., Rabczuk, T., Zhuang, X. (2025). Multigoal-oriented
+   dual-weighted-residual error estimation using PINNs. _Machine Learning for
+   Computational Science and Engineering_ **1**(1):13.
+   [doi:10.1007/s44379-025-00012-4](https://doi.org/10.1007/s44379-025-00012-4)
 4. Becker, R., Rannacher, R. (2001). An optimal control approach to a posteriori
    error estimation in finite element methods. _Acta Numerica_ **10**, 1&ndash;102.
