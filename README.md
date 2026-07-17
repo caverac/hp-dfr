@@ -42,20 +42,23 @@ remains, so the bound is carried by its remainder.
 
 ## Main result
 
-Goal-orientation helps when the network is resolution-limited, and not otherwise. The
-theory is consistent with this but does not predict it: the bound's remainder is small only
-when both networks are well resolved, which is what fails in the regime where the gain
-appears.
+Goal-orientation helps when plain DFR's **optimization has stalled**, which happens for two
+different reasons, and it hurts when neither applies. Sweeping the difficulty of the problem
+directly (steepness `k`, at fixed network and fixed discretization) separates the regimes:
 
-- **1D Poisson (control):** plain DFR already reaches its optimization floor
-  (error $\sim 3\times 10^{-5}$) at the smallest networks, so there is nothing to
-  gain. This holds at both loss weightings tried, which rules out the weight as
-  the explanation for the 2D result below.
-- **2D Poisson, peaked feature:** a network of the same size does not resolve the
-  solution everywhere, and goal-orientation reduces the median point-QoI error by
-  **1.2 to 5.3 times** (2.7 times on a geometric mean) at matched primal-network
-  degrees of freedom, winning ten of twelve runs. Note the goal-oriented method
-  trains a second network of equal size, so it carries about twice the parameters.
+- **The problem is too hard for the network** (`k >= 8`): plain DFR's error grows **84x**
+  from `k=2` to `k=16` while goal-orientation's grows **11x**, so goal-orientation ends up
+  **6 to 15 times** more accurate.
+- **The problem is easy but plain DFR stalls anyway**: at 337 DOF its error is flat to 1.3x
+  across a fourfold change in difficulty, an accuracy floor near `1e-5` insensitive to both
+  problem difficulty and network capacity. Goal-orientation passes it by **15x**.
+- **Neither** (easy problem, small network): goal-orientation is **2.4x worse**. The method
+  can hurt.
+
+The theory predicts neither gain: its remainder is small only when both networks are well
+resolved, which is what fails in both regimes where the gain appears. Note the goal-oriented
+method trains a second network of equal size, so it carries about twice the parameters at a
+given DOF.
 
 The figures, numbers, and reproduction commands are in the
 [documentation](https://caverac.github.io/hp-dfr/docs/preprint/phase3-goal-oriented#results).

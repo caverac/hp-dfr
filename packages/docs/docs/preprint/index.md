@@ -57,18 +57,20 @@ means the bound is weakest in the very regime where goal-orientation proves usef
 The comparison against plain DFR is run at matched network sizes on Poisson problems
 in one and two dimensions.
 
-- **1D: no advantage.** Plain DFR reaches its optimization floor (error of order
-  $3\times 10^{-5}$) at the smallest networks. The solution is already accurate
-  everywhere and goal-orientation offers no improvement, at either loss weighting
-  tried, including the one the 2D experiments use. This case is a control: it confirms
-  the method does not report a benefit where none exists, and rules out the loss weight
-  as the explanation for the 2D result.
+- **Resolution-limited: a large advantage.** As the solution sharpens at a fixed
+  network, plain DFR's error grows 84 times while goal-orientation's grows 11.
+  Goal-orientation ends up 6 to 15 times more accurate, winning 9 of 10 runs.
 
-- **2D: an advantage.** On a problem with a peaked feature, a network of the same
-  size is resolution-limited. Goal-orientation then reduces the median point-QoI
-  error by 1.2 to 5.3 times (2.7 times on a geometric mean) at matched
-  primal-network degrees of freedom, winning on ten of twelve configurations. The
-  theory is consistent with this result but does not predict it.
+- **Stalled at the floor: also an advantage.** On the _easiest_ problem tested, plain
+  DFR stops at an error near $10^{-5}$ that is flat across both problem difficulty and
+  network capacity. Goal-orientation passes it by 15 times. This contradicts the
+  natural expectation that there is nothing to gain once the global error is resolved.
+
+- **Neither: a real loss.** On easy problems at small networks, goal-orientation is 2.4
+  times _worse_, winning 2 of 10 runs. The method is not uniformly beneficial.
+
+What unites the two wins is that plain DFR has stopped making progress, not that the
+problem is hard. The theory predicts neither.
 
 Both cases, with the figures and the exact commands that reproduce them, are on the
 [Method and Results](/docs/preprint/phase3-goal-oriented#results) page.

@@ -7,7 +7,7 @@ seeds x epochs); the ``figures`` command is fast because it only reads the JSON.
 
 import click
 
-from hp_dfr.data import run_1d_sweep, run_2d_sweep
+from hp_dfr.data import run_1d_sweep, run_2d_steepness_sweep, run_2d_sweep
 from hp_dfr.types.common import BackendType
 
 from .common import console
@@ -25,9 +25,10 @@ def data() -> None:
     r"""Generate the preprint sweep data consumed by ``hp-dfr figures``.
 
     \b
-    hp-dfr data 1d     1D DFR vs goal-oriented sweep (m2_1d_data.json)
-    hp-dfr data 2d     2D DFR vs goal-oriented sweep (m3_2d_data.json)
-    hp-dfr data all    Both sweeps
+    hp-dfr data 1d          1D DFR vs goal-oriented sweep (m2_1d_data.json)
+    hp-dfr data 2d          2D DFR vs goal-oriented sweep (m3_2d_data.json)
+    hp-dfr data steepness   2D steepness sweep (m4_2d_steepness.json)
+    hp-dfr data all         All three sweeps
     """
 
 
@@ -47,14 +48,24 @@ def data_2d(backend: BackendType) -> None:
     run_2d_sweep(backend=backend)
 
 
+@data.command(name="steepness")
+@_backend_option
+def data_steepness(backend: BackendType) -> None:
+    """Generate the 2D steepness sweep data into the assets directory."""
+    console.print("[bold blue]Generating 2D steepness sweep data[/bold blue]")
+    run_2d_steepness_sweep(backend=backend)
+
+
 @data.command(name="all")
 @_backend_option
 def data_all(backend: BackendType) -> None:
-    """Generate both the 1D and 2D sweep data."""
+    """Generate the 1D, 2D and 2D-steepness sweep data."""
     console.print("[bold blue]Generating 1D sweep data[/bold blue]")
     run_1d_sweep(backend=backend)
     console.print("[bold blue]Generating 2D sweep data[/bold blue]")
     run_2d_sweep(backend=backend)
+    console.print("[bold blue]Generating 2D steepness sweep data[/bold blue]")
+    run_2d_steepness_sweep(backend=backend)
 
 
 __all__ = ["data"]

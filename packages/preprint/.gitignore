@@ -13,10 +13,14 @@
 *.synctex.gz
 build.log
 
-# Compiled manuscript and figures synced from ../../assets (generated;
-# assets/ at the project root is the source of truth).
+# Figures synced in from ../../assets by `make figures` (generated; assets/ at
+# the project root is the source of truth, so the copies here are not tracked).
 *.pdf
 *.png
+
+# The built manuscript is the exception: it is tracked so the current PDF is
+# readable from the repository without a LaTeX toolchain.
+!ms.pdf
 
 # elsarticle artifacts
 *.spl

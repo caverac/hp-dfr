@@ -63,10 +63,27 @@ _STEEPNESS_2D = 8.0
 _X0_2D = np.array([0.65, 0.65])
 _SIGMA_2D = 0.07
 _ARCHS_2D: list[tuple[int, ...]] = [(8, 8), (16, 16), (24, 24), (32, 32)]
-_SEEDS_2D = [0, 1, 2]
+_SEEDS_2D = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 _MODES_2D, _NQ_2D, _ADAM_2D, _LR_2D, _LBFGS_2D = 16, 32, 3000, 3e-3, 500
 _ADJ_W_2D, _PRIM_W_2D = 1.0, 5.0  # goal-oriented loss weights (adjoint / primal)
 _OUT_2D = FIG_DIR / "m3_2d_data.json"
+
+# --- 2D steepness sweep configuration ---------------------------------------
+# Tests the central claim directly: does the goal-oriented advantage grow as the
+# problem becomes more resolution-limited? Steepness is the knob, at a fixed
+# network, so it is the only variable.
+#
+# The mode count is deliberately *fixed* across the sweep and set high enough for
+# the sharpest case. Holding it at the 16 of the main sweep would make the test
+# space, not the network, the bottleneck at large k: the relative energy tail the
+# sine basis fails to represent grows from 8e-8 at k=8 to 1e-3 at k=32, so the
+# sweep would measure mode truncation instead. At 24 modes the tail stays below
+# 7e-7 for every k below, and 48 quadrature points keep two points per mode.
+_STEEPNESSES_2D: list[float] = [2.0, 4.0, 8.0, 16.0]
+_ARCHS_STEEP_2D: list[tuple[int, ...]] = [(8, 8), (16, 16)]
+_SEEDS_STEEP_2D = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+_MODES_STEEP_2D, _NQ_STEEP_2D = 24, 48
+_OUT_STEEP_2D = FIG_DIR / "m4_2d_steepness.json"
 
 
 def _n_params(arch: tuple[int, ...], dim: int) -> int:
@@ -256,4 +273,88 @@ def run_2d_sweep(backend: BackendType = "pytorch") -> Path:
     return _OUT_2D
 
 
-__all__ = ["run_1d_sweep", "run_2d_sweep"]
+def run_2d_steepness_sweep(backend: BackendType = "pytorch") -> Path:
+    """Sweep the solution's steepness at fixed networks and write its JSON.
+
+    The main 2D sweep varies the network size at one steepness, which shows *that*
+    goal-orientation helps but not that it helps *because* the network is
+    resolution-limited. This sweep varies the steepness instead, holding the
+    network and the discretization fixed, so a rising advantage with ``k`` is
+    direct evidence for that mechanism, and a flat one is evidence against it.
+
+    Two network sizes are run rather than one: the smaller is the more
+    resolution-limited and the one most favorable to goal-orientation, the larger
+    is where the main sweep finds goal-orientation weakest. A trend present in
+    both cannot be an artifact of the network size chosen.
+
+    Parameters
+    ----------
+    backend
+        Deep-learning backend passed to both models.
+
+    Returns
+    -------
+    Path
+        Location of the written ``m4_2d_steepness.json`` file.
+    """
+    warnings.filterwarnings("ignore")
+    records: list[dict[str, object]] = []
+    pts = np.column_stack([np.repeat(np.linspace(0, 1, 200), 200), np.tile(np.linspace(0, 1, 200), 200)])
+
+    for steepness in _STEEPNESSES_2D:
+        prob = ArcTanBump2D(steepness=steepness)
+        qoi_err = _make_qoi_error_2d(PointEvaluationQoI(point=_X0_2D, sigma=_SIGMA_2D), prob)
+
+        for arch in _ARCHS_STEEP_2D:
+            dof = _n_params(arch, dim=2)
+            for seed in _SEEDS_STEEP_2D:
+                dfr = DFRModel(
+                    hidden_layers=arch,
+                    n_fourier_modes=_MODES_STEEP_2D,
+                    n_quadrature=_NQ_STEEP_2D,
+                    backend=backend,
+                    seed=seed,
+                    dim=2,
+                )
+                dfr.build()
+                dfr.fit(prob, epochs=_ADAM_2D, learning_rate=_LR_2D, verbose=False, lbfgs_iters=_LBFGS_2D)
+                dfr_q = qoi_err(dfr.predict(pts))
+
+                go = GoalOrientedDFRModel(
+                    hidden_layers=arch,
+                    dim=2,
+                    qoi=PointEvaluationQoI(point=_X0_2D, sigma=_SIGMA_2D),
+                    n_modes=_MODES_STEEP_2D,
+                    n_quadrature=_NQ_STEEP_2D,
+                    adjoint_weight=_ADJ_W_2D,
+                    primal_weight=_PRIM_W_2D,
+                    backend=backend,
+                    seed=seed,
+                )
+                go.build()
+                go.fit(prob, epochs=_ADAM_2D, learning_rate=_LR_2D, verbose=False, lbfgs_iters=_LBFGS_2D)
+                go_q = qoi_err(go.predict(pts))
+
+                records.append(
+                    {
+                        "problem": "arctanbump2d",
+                        "steepness": steepness,
+                        "dof": dof,
+                        "seed": seed,
+                        "primal_weight": _PRIM_W_2D,
+                        "dfr_qoi": dfr_q,
+                        "go_qoi": go_q,
+                        **_go_diagnostics(go),
+                    }
+                )
+                console.print(
+                    f"k={steepness:4.1f} dof={dof:4d} seed={seed} | DFR={dfr_q:.2e} GO={go_q:.2e}",
+                    markup=False,
+                )
+                _OUT_STEEP_2D.write_text(json.dumps(records, indent=2), encoding="utf-8")
+
+    console.print(f"wrote {_OUT_STEEP_2D}", markup=False)
+    return _OUT_STEEP_2D
+
+
+__all__ = ["run_1d_sweep", "run_2d_steepness_sweep", "run_2d_sweep"]

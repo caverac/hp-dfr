@@ -86,14 +86,15 @@ runs the bound holds every time, at a median of ten times the true error, but th
 alone is not an error estimator: training drives it about five orders of magnitude below
 the error that remains.
 
-The experiments locate where goal-orientation helps. On 1D Poisson problems, plain
-DFR reaches its optimization floor (an error of order $3\times 10^{-5}$) at very
-small networks; the solution is already accurate everywhere and goal-orientation
-offers no advantage, at either loss weighting tried. On a 2D problem with a peaked
-feature, a network of the same size does not resolve the solution everywhere, and
-goal-orientation reduces the median QoI error by 1.2 to 5.3 times at matched
-primal-network degrees of freedom. The [results](/docs/preprint/phase3-goal-oriented#results)
-present both cases, with the command that reproduces each figure.
+The experiments locate where goal-orientation helps by varying the difficulty of the
+problem directly, at a fixed network and a fixed discretization. It helps whenever
+plain DFR's optimization has stalled, which happens two ways. When the problem is too
+hard for the network, plain DFR's error grows 84 times while goal-orientation's grows
+11, leaving it 6 to 15 times more accurate. When the problem is easy but plain DFR
+stops at an accuracy floor regardless, goal-orientation passes that floor by 15 times.
+In between, on easy problems at small networks, it is 2.4 times worse: the method can
+hurt. The [results](/docs/preprint/phase3-goal-oriented#results) present all three
+regimes, with the command that reproduces each figure.
 
 ## Scope
 

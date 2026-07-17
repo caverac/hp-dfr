@@ -67,15 +67,15 @@ def _median_band(records: list[Record], problem: str, key: str, primal_weight: f
 def figure_dfr_saturation_1d() -> Figure:
     r"""Plot the QoI error versus degrees of freedom for both methods.
 
-    On both a smooth (sine) and a sharp (arctan) 1D Poisson problem, plain DFR
-    reaches its accuracy floor (~3e-5) already at the smallest network sizes, so
-    there is no resolution-limited regime for goal-orientation to exploit. The
-    goal-oriented variant is less accurate at small and moderate sizes and
-    catches up only at the largest.
+    On both a smooth (sine) and a peaked (arctan) 1D Poisson problem, plain DFR
+    reaches its accuracy floor (~3e-5) already at the smallest network sizes and
+    does not improve on it thereafter. The goal-oriented variant is less accurate
+    at small and moderate sizes, at either loss weight, so the weight the 2D sweep
+    uses does not by itself manufacture an advantage.
 
-    Both goal-oriented loss weights are shown: the 1D value and the value the 2D
-    sweep uses. The 2D weight does not rescue goal-orientation here, which is
-    what rules out the weight as the explanation for the 2D result.
+    At the largest networks the heavier weight overtakes the baseline on both
+    problems, passing a floor the baseline cannot. The steepness sweep shows this
+    is a reproducible effect, not seed noise.
 
     Markers are medians over seeds; bands span the seed min--max.
     """
@@ -192,8 +192,57 @@ def figure_bound_verification() -> Figure:
     return fig
 
 
+def _steepness_band(records: list[Record], dof: int, key: str) -> MedianBand:
+    """Return (steepnesses, median, lo, hi) over seeds for one method/network size."""
+    by_k: dict[float, list[float]] = defaultdict(list)
+    for r in records:
+        if r["dof"] == dof:
+            by_k[cast(float, r["steepness"])].append(cast(float, r[key]))
+    ks = sorted(by_k)
+    med = np.array([np.median(by_k[k]) for k in ks])
+    lo = np.array([np.min(by_k[k]) for k in ks])
+    hi = np.array([np.max(by_k[k]) for k in ks])
+    return np.array(ks), med, lo, hi
+
+
+@figure("dfr-vs-go-steepness")
+def figure_dfr_vs_go_steepness() -> Figure:
+    r"""Plot the QoI error against the solution's steepness at fixed network size.
+
+    Steepness is the knob that makes the problem resolution-limited, at a fixed
+    network and a fixed discretization, so it isolates the mechanism the method is
+    supposed to exploit. Plain DFR sits at its optimization floor while the problem
+    is easy and then degrades sharply; the goal-oriented method degrades far more
+    slowly, so the gap opens as the problem hardens.
+    """
+    records = _load("m4_2d_steepness.json")
+    styles = [
+        ("dfr_qoi", "-", "o", "DFR"),
+        ("go_qoi", "--", "s", "Goal-Oriented DFR"),
+    ]
+    dofs = sorted({cast(int, r["dof"]) for r in records})
+
+    fig = Figure(figsize=(5.4, 6.2))
+    top = fig.add_subplot(2, 1, 1)
+    bot = fig.add_subplot(2, 1, 2, sharex=top)
+    for ax, dof in zip([top, bot], dofs):
+        for key, ls, marker, label in styles:
+            ks, med, lo, hi = _steepness_band(records, dof, key)
+            ax.fill_between(ks, lo, hi, color="0.6", alpha=0.25, linewidth=0)
+            ax.plot(ks, med, color="black", linestyle=ls, marker=marker, linewidth=1.6, markersize=6, markerfacecolor="white", label=label)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_ylabel(r"$|J_\sigma(u_h) - J_\sigma(u^*)|$")
+        ax.text(0.03, 0.93, rf"$N_{{\mathrm{{dof}}}} = {dof}$", transform=ax.transAxes, ha="left", va="top")
+    bot.set_xlabel(r"$k$")
+    top.tick_params(labelbottom=False)  # x-axis shared with the bottom panel
+    top.legend(loc="upper left", bbox_to_anchor=(0.03, 0.86))
+    return fig
+
+
 def make_all_figures() -> None:
     """Build and write every preprint figure."""
     figure_dfr_saturation_1d()
     figure_dfr_vs_go_2d()
     figure_bound_verification()
+    figure_dfr_vs_go_steepness()
