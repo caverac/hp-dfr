@@ -439,7 +439,7 @@ One detail here is easy to dismiss as noise and turns out not to be. At the larg
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{dfr-saturation-1d}
+\includegraphics[width=0.85\textwidth]{dfr-saturation-1d}
 \caption{QoI error versus primal-network degrees of freedom (DOF) on 1D Poisson problems (smooth, top; peaked, bottom). Plain DFR reaches a QoI error of about $3 \times 10^{-5}$ at extremely small network sizes and does not improve on it as the network grows. Goal-oriented DFR (GO-DFR) is the worse method at small and moderate sizes, at either loss weight, so the weight used by the 2D experiments ($\alpha = \beta = 5$) does not by itself manufacture an advantage. At the largest networks $\alpha = \beta = 5$ overtakes the baseline on both problems, the same reallocation the 2D experiments show. Markers show medians over random seeds; bands span the seed min--max.}
 \label{fig:dfr-saturation}
 \end{figure}
@@ -457,7 +457,7 @@ Neither method is monotone in the degrees of freedom, plain DFR being at its bes
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{dfr-vs-go-2d}
+\includegraphics[width=0.85\textwidth]{dfr-vs-go-2d}
 \caption{QoI error versus primal-network degrees of freedom (DOF) on the 2D Poisson problem with an arctan bump, at a matched training budget. The goal-oriented DFR method (GO-DFR), which holds the adjoint fixed in the goal term and weights the dual norm by the coupled eigenvalues $\lambda_k = \sum_i (\pi k_i / L_i)^2$, redirects the network's accuracy toward the support of the QoI. It wins 33 of the 40 runs and reduces the median QoI error by 2.3 to 3.9 times at matched primal-network DOF, a geometric mean of 3.1 times. The baseline is not converged at this budget (Section~\ref{sec:results-tradeoff}), so this is a matched-budget rather than a matched-accuracy comparison, and GO-DFR additionally trains a second network of equal size. Markers show medians over random seeds; bands span the seed min--max.}
 \label{fig:dfr-vs-go-2d}
 \end{figure}
@@ -493,7 +493,7 @@ So the sweep confirms the resolution-limited advantage it was designed to test, 
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{dfr-vs-go-steepness}
+\includegraphics[width=0.85\textwidth]{dfr-vs-go-steepness}
 \caption{QoI error versus the solution's steepness $k$ at fixed network size ($105$ degrees of freedom, top; $337$, bottom) and fixed discretization, so that $k$ is the only variable, at a matched training budget. Plain DFR changes little while the problem is easy and then degrades sharply, by a factor of $84$ between $k=2$ and $k=16$ at $105$ degrees of freedom; goal-oriented DFR degrades by a factor of $11$ over the same range, so the gap opens as the problem hardens and the two curves cross near $k \approx 5$. Below the crossover, at $k=4$ and $105$ degrees of freedom, goal-orientation is the worse method. At $337$ degrees of freedom it is ahead everywhere, including at $k=2$; there the advantage comes from the baseline being under-converged at the shared budget (Section~\ref{sec:results-tradeoff}) rather than from resolution limitation. Markers show medians over ten random seeds; bands span the seed min--max.}
 \label{fig:steepness}
 \end{figure}
@@ -507,7 +507,7 @@ The experiments above report the QoI error alone. Two further quantities settle 
 
 \emph{The baseline is not converged.} Training plain DFR far past the shared budget shows its error still falling. On the $2$D problem of Section~\ref{sec:results-2d} the dual-norm residual drops by a factor of $6$ between the $3000$ Adam steps used throughout and $50\,000$, and is still decreasing at the end, with no plateau; on the easy $k = 2$ problem a longer run lowers the QoI by a further factor of about $6$. What looked in Sections~\ref{sec:results-1d} and~\ref{sec:results-steepness} like an accuracy floor -- an error insensitive to problem difficulty and network size -- is instead a fixed training budget cutting a slow decay at the same point each time. There is no floor; there is a schedule.
 
-This places an honest boundary on the results. The comparisons throughout are at a matched training \emph{budget}, not at matched accuracy, and the baseline has not converged at that budget. The direction of the effect is not in question: reallocation happens within a single run and does not depend on either method being converged, and where the solution is genuinely too sharp to represent (large $k$) plain DFR cannot reach a small residual at any budget we tried, so the advantage there is robust. But the \emph{size} of the advantage on the easier problems is inflated by comparing against an under-trained baseline, and a comparison at matched cost -- goal-orientation trains a second network and costs about $2.5$ times as much per run -- would be the fairer measure. We have not carried it out, and we do not claim the reported factors survive it unchanged.
+This places an honest boundary on the results. The comparisons throughout are at a matched training \emph{budget}, not at matched accuracy, and the baseline has not converged at that budget. A matched-budget comparison is nonetheless the right first benchmark, and we report it deliberately: holding the optimizer, step count, learning rate and schedule identical isolates the effect of the goal-oriented objective from any difference in training dynamics, which is exactly what is needed to establish that the reallocation is a property of the loss rather than of how the two methods happen to be trained. The direction of the effect is not in question: reallocation happens within a single run and does not depend on either method being converged, and where the solution is genuinely too sharp to represent (large $k$) plain DFR cannot reach a small residual at any budget we tried, so the advantage there is robust. But the \emph{size} of the advantage on the easier problems is inflated by comparing against an under-trained baseline, and a comparison at matched cost -- goal-orientation trains a second network and costs about $2.5$ times as much per run -- would be the fairer measure of it. We have not carried it out, and we do not claim the reported factors survive it unchanged.
 
 \subsection{Does the bound hold, and is the loss an estimator?}
 \label{sec:results-bound}
@@ -524,7 +524,7 @@ This has a practical consequence worth stating plainly. A reader who took $\math
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{bound-verification}
+\includegraphics[width=0.85\textwidth]{bound-verification}
 \caption{Verification of the QoI error bound~\eqref{eq:main} on the goal-oriented runs of the network-size sweeps (1D, top; 2D, bottom). The abscissa is the QoI error actually committed; the dashed diagonal is equality. The bound (circles) lies above the diagonal on every run, exceeding the true error by a median factor of $9.8$ in 1D and $17.7$ in 2D; across all 168 runs of the study, including the steepness sweep, it holds without exception. The goal term $\mathcal{L}_{\mathrm{QoI}}$ alone (squares) lies far \emph{below} the diagonal: training minimizes it directly, driving it some five orders of magnitude beneath the error that remains, so it cannot serve as an error estimator and the bound is carried entirely by its remainder.}
 \label{fig:bound}
 \end{figure}
