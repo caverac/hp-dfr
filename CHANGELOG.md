@@ -1,3 +1,9 @@
+# [1.2.0](https://github.com/caverac/hp-dfr/compare/v1.1.0...v1.2.0) (2026-07-17)
+
+### Features
+
+- reframe results around reallocation vs an under-converged baseline ([3138181](https://github.com/caverac/hp-dfr/commit/313818176d257f796e73b3bb36311f40d7e8fe2f))
+
 # [1.1.0](https://github.com/caverac/hp-dfr/compare/v1.0.3...v1.1.0) (2026-07-16)
 
 ### Features
