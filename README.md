@@ -42,23 +42,27 @@ remains, so the bound is carried by its remainder.
 
 ## Main result
 
-Goal-orientation helps when plain DFR's **optimization has stalled**, which happens for two
-different reasons, and it hurts when neither applies. Sweeping the difficulty of the problem
-directly (steepness `k`, at fixed network and fixed discretization) separates the regimes:
+Goal-orientation **reallocates accuracy from the global solution to the quantity of
+interest**: at a matched training budget it reaches a QoI error about **15x smaller** than
+plain DFR (Section 6.3) while its global energy error is about an **order of magnitude
+larger**, on every seed. It therefore
+helps wherever plain DFR leaves QoI-relevant residual unresolved, and hurts where it does
+not. Sweeping the steepness `k` at fixed network and discretization shows both sides:
 
 - **The problem is too hard for the network** (`k >= 8`): plain DFR's error grows **84x**
   from `k=2` to `k=16` while goal-orientation's grows **11x**, so goal-orientation ends up
   **6 to 15 times** more accurate.
-- **The problem is easy but plain DFR stalls anyway**: at 337 DOF its error is flat to 1.3x
-  across a fourfold change in difficulty, an accuracy floor near `1e-5` insensitive to both
-  problem difficulty and network capacity. Goal-orientation passes it by **15x**.
+- **The training budget is too small** (easy problem, larger network): plain DFR has not
+  converged, and goal-orientation extracts more QoI accuracy from the same budget (**~15x**).
 - **Neither** (easy problem, small network): goal-orientation is **2.4x worse**. The method
   can hurt.
 
-The theory predicts neither gain: its remainder is small only when both networks are well
-resolved, which is what fails in both regimes where the gain appears. Note the goal-oriented
-method trains a second network of equal size, so it carries about twice the parameters at a
-given DOF.
+Two honest caveats. Plain DFR is **not trained to convergence** at the shared budget (its
+error is still falling at 10x the steps), so these are matched-_budget_, not matched-accuracy
+comparisons, and the magnitudes on easy problems would shrink under a longer schedule; the
+mechanism and the large-`k` advantage do not depend on it. And goal-oriented solutions are
+accurate at the QoI but ~10x worse globally, so they are trustworthy at the quantity of
+interest and nowhere else. The theory predicts none of this.
 
 The figures, numbers, and reproduction commands are in the
 [documentation](https://caverac.github.io/hp-dfr/docs/preprint/phase3-goal-oriented#results).

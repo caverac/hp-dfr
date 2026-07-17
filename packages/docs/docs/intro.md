@@ -86,15 +86,17 @@ runs the bound holds every time, at a median of ten times the true error, but th
 alone is not an error estimator: training drives it about five orders of magnitude below
 the error that remains.
 
-The experiments locate where goal-orientation helps by varying the difficulty of the
-problem directly, at a fixed network and a fixed discretization. It helps whenever
-plain DFR's optimization has stalled, which happens two ways. When the problem is too
-hard for the network, plain DFR's error grows 84 times while goal-orientation's grows
-11, leaving it 6 to 15 times more accurate. When the problem is easy but plain DFR
-stops at an accuracy floor regardless, goal-orientation passes that floor by 15 times.
-In between, on easy problems at small networks, it is 2.4 times worse: the method can
-hurt. The [results](/docs/preprint/phase3-goal-oriented#results) present all three
-regimes, with the command that reproduces each figure.
+The experiments show goal-orientation _reallocating_ accuracy from the global solution
+to the quantity of interest: at a matched training budget it reaches a QoI error about
+15 times smaller than plain DFR while its global energy error is about an order of
+magnitude larger.
+It helps wherever plain DFR leaves QoI-relevant residual unresolved, whether because the
+problem is too hard for the network (error 6 to 15 times smaller) or because the shared
+budget is too small to converge the baseline; it hurts, by 2.4 times, on easy problems
+where the baseline is already accurate. Plain DFR is not trained to convergence at that
+budget, so the magnitudes are matched-budget rather than matched-accuracy. The
+[results](/docs/preprint/phase3-goal-oriented#results) present each case, with the
+command that reproduces each figure.
 
 ## Scope
 

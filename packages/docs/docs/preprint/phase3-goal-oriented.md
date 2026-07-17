@@ -263,16 +263,15 @@ Three regimes appear:
 - **A real loss** (`k=4`, 105 DOF): goal-orientation is 2.4x _worse_, winning 2 of 10 runs.
   The problem is easy enough that there is no misallocated capacity to recover, and the
   second network is a pure cost.
-- **Stalled at the floor** (`k=2`, 337 DOF): on the _easiest_ problem, goal-orientation is
-  15.4x better, winning 9 of 10. This is not resolution limitation. Plain DFR's error there
-  is flat to 1.3x across a fourfold change in difficulty, the signature of an optimization
-  floor; goal-orientation reaches 15x below it.
+- **Under-trained baseline** (`k=2`, 337 DOF): on the _easiest_ problem, goal-orientation
+  is still 15.4x better, winning 9 of 10. This is not resolution limitation, and not an
+  accuracy floor: plain DFR has simply not converged at the shared budget (see below), and
+  goal-orientation extracts more QoI accuracy from the same budget.
 
-What unites the two wins is that plain DFR has stopped making progress, for different
-reasons: against the network's capacity in the first case, against its own accuracy floor
-in the second. Where goal-orientation loses is where neither stall has set in. The
-organizing variable is not how hard the problem is but whether the baseline is still
-improving.
+What unites the wins is that goal-orientation reallocates accuracy toward the QoI wherever
+plain DFR leaves QoI-relevant residual unresolved. Where it loses, there is little to
+reallocate and the second network is pure cost. The organizing variable is not how hard the
+problem is but whether the baseline leaves residual on the table.
 
 ### Does the bound hold, and is the loss an estimator?
 
@@ -305,35 +304,39 @@ right-hand side of the bound, which the remainder carries. This is a general haz
 training on an a posteriori quantity: any residual functional that appears in the loss
 is disqualified from also estimating what the loss failed to remove.
 
-### Why the two regimes differ
+### One mechanism: reallocation
 
-Goal-orientation helps in two situations that look opposite and are not. In the first the
-problem is too hard for the network, so the residual cannot be made uniformly small and the
-goal-oriented objective spends a limited budget where the adjoint says it matters. In the
-second the problem is easy and there is capacity to spare, but plain DFR stops improving
-anyway, at a floor near $10^{-5}$ that is insensitive to the difficulty of the problem.
+Goal-orientation does one thing, and it explains the whole picture: it reallocates the
+network's accuracy from the global solution to the quantity of interest. Measured on the
+`k=2`, 337-parameter problem, at a matched budget and on every seed, it reaches a QoI error
+about 15 times smaller than plain DFR while its global energy error is roughly an order
+of magnitude _larger_ (9.8% against 0.9%) and its residual several times larger. It does not solve the problem better; it
+solves a different problem, and a goal-oriented solution is trustworthy at its QoI and
+nowhere else.
 
-What the two share is that plain DFR's optimization has stalled: against the network's
-capacity in the first case, against its own accuracy floor in the second. In both, the
-residual left over is distributed without regard to the QoI, and reweighting it recovers
-accuracy the baseline leaves on the table. Where goal-orientation loses is where neither
-stall has set in: the baseline is still converging, nothing is misallocated, and the second
-network is pure cost. The organizing variable is not how hard the problem is but whether the
-baseline is still making progress, which is why "goal-orientation helps when the problem is
-hard" is wrong at both ends of the steepness sweep.
+It therefore helps precisely when plain DFR leaves QoI-relevant residual unresolved, and
+hurts when it does not. The residual is left unresolved for two reasons that drive the same
+behavior: the solution may be too sharp to represent at any budget (large `k`), or the
+shared training budget may be too small to converge an otherwise capable network (`k=2` at
+337 parameters, and the easy 1D problems). Where goal-orientation loses -- small networks on
+easy problems -- plain DFR has little QoI-relevant residual to give up, so the trade returns
+nothing. "Goal-orientation helps when the problem is hard" is wrong at both ends of the
+sweep.
 
-The theorem predicts neither behavior. Its remainder is small only when both networks are
-well resolved, which is what fails where the gains appear, so it accommodates the results
-without explaining them. It has still less to say about the second regime, which is a claim
-about where an optimizer stops, while the analysis is entirely approximation-theoretic and
-contains no model of training at all.
+**The baseline is not converged.** What looked like an accuracy floor is a fixed training
+budget cutting a slow decay at the same point each time. Trained past the shared budget,
+plain DFR keeps improving: its residual drops 6x from 3000 to 50000 Adam steps on the 2D
+problem, still falling, with no plateau. So the comparisons here are at matched _budget_,
+not matched accuracy. The reallocation mechanism does not depend on this, and the large-`k`
+advantage (where the baseline cannot reach a small residual at any budget) survives it, but
+the size of the advantage on easy problems would shrink under a longer schedule. A
+matched-cost comparison -- goal-orientation trains a second network, at about 2.5x the cost
+per run -- would be the fairer measure, and remains to be done.
 
-The floor deserves its own note. Plain DFR's error is flat to 1.3x across a fourfold change
-in problem difficulty, and to a factor of two across a twelvefold change in network size. A
-limit insensitive to both is not an approximation limit; it is where the optimizer stops.
-Diagnosing it is open, and it matters: a method whose accuracy is set by its optimizer
-rather than its discretization is one whose error analysis describes something other than
-what limits it in practice.
+The theorem predicts none of this. Its remainder is small only when both networks are well
+resolved, which is what fails where the gains appear, so it accommodates the results without
+explaining them, and it has no model of the optimization whose budget turns out to matter so
+much.
 
 Two implementation points are necessary to observe this behavior: the adjoint must be
 trained on its own residual and held fixed in the goal term, and in two dimensions the

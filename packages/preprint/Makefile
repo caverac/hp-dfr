@@ -1,5 +1,13 @@
 # Makefile for the single-file LaTeX manuscript (ms.tex).
 
+# ms.pdf is tracked, so the build must be reproducible: pdflatex stamps
+# CreationDate/ModDate into the PDF, which would make every rebuild show up as a
+# modification to a binary file even when the manuscript has not changed. These
+# two variables pin the timestamp (the reproducible-builds convention), so a
+# rebuild of unchanged sources is byte-identical and `git status` stays honest.
+export SOURCE_DATE_EPOCH = 0
+export FORCE_SOURCE_DATE = 1
+
 MS     = ms
 LATEX  = pdflatex -interaction=nonstopmode
 BIBTEX = bibtex

@@ -61,16 +61,19 @@ in one and two dimensions.
   network, plain DFR's error grows 84 times while goal-orientation's grows 11.
   Goal-orientation ends up 6 to 15 times more accurate, winning 9 of 10 runs.
 
-- **Stalled at the floor: also an advantage.** On the _easiest_ problem tested, plain
-  DFR stops at an error near $10^{-5}$ that is flat across both problem difficulty and
-  network capacity. Goal-orientation passes it by 15 times. This contradicts the
-  natural expectation that there is nothing to gain once the global error is resolved.
+- **Under-trained baseline: also an advantage.** On the _easiest_ problem tested,
+  goal-orientation is still 15 times more accurate. This is not resolution limitation
+  and not an accuracy floor: plain DFR has simply not converged at the shared training
+  budget, and goal-orientation extracts more QoI accuracy from the same budget.
 
 - **Neither: a real loss.** On easy problems at small networks, goal-orientation is 2.4
   times _worse_, winning 2 of 10 runs. The method is not uniformly beneficial.
 
-What unites the two wins is that plain DFR has stopped making progress, not that the
-problem is hard. The theory predicts neither.
+What unites the wins is that goal-orientation reallocates accuracy toward the QoI (about
+15 times better there, roughly an order of magnitude worse globally) wherever plain DFR leaves
+QoI-relevant residual unresolved. Because the baseline is not trained to convergence,
+these are matched-budget rather than matched-accuracy comparisons. The theory predicts
+none of it.
 
 Both cases, with the figures and the exact commands that reproduce them, are on the
 [Method and Results](/docs/preprint/phase3-goal-oriented#results) page.
