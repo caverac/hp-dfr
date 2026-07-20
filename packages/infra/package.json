@@ -1,0 +1,24 @@
+{
+  "name": "@hp-dfr/infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "cdk": "cdk",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy --require-approval never",
+    "destroy": "cdk destroy",
+    "diff": "cdk diff",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.260.0",
+    "constructs": "^10.6.0",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "aws-cdk": "^2.1128.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}

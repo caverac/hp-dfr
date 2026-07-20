@@ -32,7 +32,7 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
-from typing import Callable
+from typing import Callable, NamedTuple, TypeVar
 
 import numpy as np
 import numpy.typing as npt
@@ -45,6 +45,7 @@ from hp_dfr.types.common import BackendType
 from hp_dfr.utils import console
 
 ArrayF = npt.NDArray[np.float64]
+_ShardItem = TypeVar("_ShardItem")
 
 # --- 1D sweep configuration ------------------------------------------------
 # Each problem maps to (instance, relative QoI location in [0, 1]).
@@ -574,9 +575,226 @@ def run_2d_convergence_sweep(backend: BackendType = "pytorch") -> Path:
     return _OUT_CONV
 
 
+# --- matched-cost sweep configuration --------------------------------------
+# Goal-orientation trains a second network, so a run costs roughly 2.5 times a
+# plain-DFR run (Section 6.4 of the manuscript). A matched-*budget* comparison
+# therefore under-resources plain DFR. The matched-*cost* comparison gives plain
+# DFR _DFR_STEP_MULT times the Adam and LBFGS budget so the two methods get
+# comparable wall-clock. The multiplier is a conservative upper estimate of the
+# measured cost ratio (~1.9 to 2.5), so if goal-orientation still wins, the
+# baseline was if anything over-resourced. It is designed to be run in shards, one
+# Fargate task per shard; the shards are merged with :func:`merge_matched_cost_shards`.
+_DFR_STEP_MULT = 2.5
+
+# A single (steepness, network architecture, seed) unit of work.
+MatchedCostItem = tuple[float, tuple[int, ...], int]
+
+
+class _MatchedCostSpec(NamedTuple):
+    """A matched-cost sweep: its flat work list and the discretization it uses."""
+
+    items: list[MatchedCostItem]
+    modes: int
+    nq: int
+
+
+# "steepness" varies the steepness at two fixed networks (the mechanism figure);
+# "2d" varies the network size at a fixed steepness (the headline table).
+_MATCHED_COST_SWEEPS: dict[str, _MatchedCostSpec] = {
+    "steepness": _MatchedCostSpec(
+        items=[(k, arch, seed) for k in _STEEPNESSES_2D for arch in _ARCHS_STEEP_2D for seed in _SEEDS_STEEP_2D],
+        modes=_MODES_STEEP_2D,
+        nq=_NQ_STEEP_2D,
+    ),
+    "2d": _MatchedCostSpec(
+        items=[(_STEEPNESS_2D, arch, seed) for arch in _ARCHS_2D for seed in _SEEDS_2D],
+        modes=_MODES_2D,
+        nq=_NQ_2D,
+    ),
+}
+
+
+def _shard_items(items: list[_ShardItem], shard: int, num_shards: int) -> list[_ShardItem]:
+    """Return the shard-th slice of ``items`` under round-robin partitioning.
+
+    Round-robin (``index % num_shards == shard``) rather than contiguous blocks so
+    that each shard sees a mix of cheap and expensive runs, keeping shard runtimes
+    balanced when cost varies with the work item (larger networks cost more).
+
+    Parameters
+    ----------
+    items
+        The full work list.
+    shard
+        Zero-based shard index, in ``[0, num_shards)``.
+    num_shards
+        Total number of shards.
+
+    Returns
+    -------
+    list[object]
+        The work items assigned to this shard.
+
+    Raises
+    ------
+    ValueError
+        If ``num_shards`` is not positive or ``shard`` is out of range.
+    """
+    if num_shards < 1:
+        raise ValueError(f"num_shards must be >= 1, got {num_shards}")
+    if not 0 <= shard < num_shards:
+        raise ValueError(f"shard must be in [0, {num_shards}), got {shard}")
+    return [it for i, it in enumerate(items) if i % num_shards == shard]
+
+
+def _matched_cost_path(which: str, shard: int, num_shards: int) -> Path:
+    """Output path for a matched-cost run, per shard or merged (``num_shards == 1``)."""
+    if num_shards == 1:
+        return FIG_DIR / f"matched_cost_{which}.json"
+    return FIG_DIR / f"matched_cost_{which}.shard{shard}of{num_shards}.json"
+
+
+def run_2d_matched_cost_sweep(
+    which: str = "steepness",
+    shard: int = 0,
+    num_shards: int = 1,
+    backend: BackendType = "pytorch",
+) -> Path:
+    """Repeat a 2D sweep giving plain DFR matched wall-clock rather than matched steps.
+
+    Trains plain DFR at :data:`_DFR_STEP_MULT` times the budget of goal-oriented
+    DFR, so the comparison holds computational cost fixed instead of step count.
+    The work list is partitioned into ``num_shards`` shards (:func:`_shard_items`)
+    and only ``shard`` is run, so the sweep can be spread over parallel Fargate
+    tasks; :func:`merge_matched_cost_shards` recombines them.
+
+    Parameters
+    ----------
+    which
+        Which sweep to repeat: ``"steepness"`` or ``"2d"`` (see
+        :data:`_MATCHED_COST_SWEEPS`).
+    shard
+        Zero-based shard index to run.
+    num_shards
+        Total number of shards the work is partitioned into.
+    backend
+        Deep-learning backend passed to both models.
+
+    Returns
+    -------
+    Path
+        Location of the written shard (or merged) JSON file.
+
+    Raises
+    ------
+    KeyError
+        If ``which`` is not a known sweep.
+    """
+    if which not in _MATCHED_COST_SWEEPS:
+        raise KeyError(f"unknown matched-cost sweep {which!r}; choose from {sorted(_MATCHED_COST_SWEEPS)}")
+    warnings.filterwarnings("ignore")
+    spec = _MATCHED_COST_SWEEPS[which]
+    modes, nq = spec.modes, spec.nq
+    items = _shard_items(spec.items, shard, num_shards)
+    dfr_adam, dfr_lbfgs = int(_ADAM_2D * _DFR_STEP_MULT), int(_LBFGS_2D * _DFR_STEP_MULT)
+    pts = _full_grid_2d()
+
+    records: list[dict[str, object]] = []
+    out = _matched_cost_path(which, shard, num_shards)
+    for steepness, arch, seed in items:
+        prob = ArcTanBump2D(steepness=steepness)
+        qoi_err = _make_qoi_error_2d(PointEvaluationQoI(point=_X0_2D, sigma=_SIGMA_2D), prob)
+        dof = _n_params(arch, dim=2)
+
+        dfr = DFRModel(hidden_layers=arch, n_fourier_modes=modes, n_quadrature=nq, backend=backend, seed=seed, dim=2)
+        dfr.build()
+        dfr.fit(prob, epochs=dfr_adam, learning_rate=_LR_2D, verbose=False, lbfgs_iters=dfr_lbfgs)
+        dfr_q = qoi_err(dfr.predict(pts))
+
+        go = GoalOrientedDFRModel(
+            hidden_layers=arch,
+            dim=2,
+            qoi=PointEvaluationQoI(point=_X0_2D, sigma=_SIGMA_2D),
+            n_modes=modes,
+            n_quadrature=nq,
+            adjoint_weight=_ADJ_W_2D,
+            primal_weight=_PRIM_W_2D,
+            backend=backend,
+            seed=seed,
+        )
+        go.build()
+        go.fit(prob, epochs=_ADAM_2D, learning_rate=_LR_2D, verbose=False, lbfgs_iters=_LBFGS_2D)
+        go_q = qoi_err(go.predict(pts))
+
+        records.append(
+            {
+                "problem": "arctanbump2d",
+                "which": which,
+                "steepness": steepness,
+                "dof": dof,
+                "seed": seed,
+                "primal_weight": _PRIM_W_2D,
+                "matched_cost": True,
+                "dfr_adam": dfr_adam,
+                "dfr_lbfgs": dfr_lbfgs,
+                "dfr_qoi": dfr_q,
+                "go_qoi": go_q,
+                **_go_diagnostics(go),
+            }
+        )
+        console.print(
+            f"[{which}] k={steepness:4.1f} dof={dof:4d} seed={seed} shard={shard}/{num_shards} | DFR={dfr_q:.2e} GO={go_q:.2e}",
+            markup=False,
+        )
+        out.write_text(json.dumps(records, indent=2), encoding="utf-8")
+
+    console.print(f"wrote {out}", markup=False)
+    return out
+
+
+def merge_matched_cost_shards(which: str, num_shards: int) -> Path:
+    """Combine matched-cost shard files into the canonical ``matched_cost_<which>.json``.
+
+    Parameters
+    ----------
+    which
+        Which sweep was run: ``"steepness"`` or ``"2d"``.
+    num_shards
+        Number of shards to combine.
+
+    Returns
+    -------
+    Path
+        Location of the merged JSON file.
+
+    Raises
+    ------
+    FileNotFoundError
+        If any shard file is missing.
+    ValueError
+        If the shards contain duplicate (steepness, dof, seed) work items.
+    """
+    records: list[dict[str, object]] = []
+    for shard in range(num_shards):
+        path = _matched_cost_path(which, shard, num_shards)
+        if not path.exists():
+            raise FileNotFoundError(f"missing shard {path}; run all {num_shards} shards first")
+        records.extend(json.loads(path.read_text(encoding="utf-8")))
+    keys = [(r["steepness"], r["dof"], r["seed"]) for r in records]
+    if len(keys) != len(set(keys)):
+        raise ValueError("duplicate (steepness, dof, seed) across shards; check the shard/num_shards used")
+    records.sort(key=lambda r: (r["steepness"], r["dof"], r["seed"]))
+    merged = FIG_DIR / f"matched_cost_{which}.json"
+    merged.write_text(json.dumps(records, indent=2), encoding="utf-8")
+    console.print(f"wrote {merged} ({len(records)} runs from {num_shards} shards)", markup=False)
+    return merged
+
+
 __all__ = [
+    "merge_matched_cost_shards",
     "run_1d_sweep",
     "run_2d_convergence_sweep",
+    "run_2d_matched_cost_sweep",
     "run_2d_steepness_sweep",
     "run_2d_sweep",
     "run_2d_tradeoff_sweep",

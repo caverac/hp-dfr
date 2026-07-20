@@ -1,0 +1,19 @@
+{
+  "app": "npx tsx src/bin/index.ts",
+  "watch": {
+    "include": ["src/**"],
+    "exclude": [
+      "README.md",
+      "cdk*.json",
+      "**/*.d.ts",
+      "tsconfig*.json",
+      "package*.json",
+      "node_modules"
+    ]
+  },
+  "context": {
+    "@aws-cdk/core:target-partitions": ["aws", "aws-cn"],
+    "@aws-cdk/aws-ec2:uniqueImdsv2TemplateName": true,
+    "@aws-cdk/aws-ecs:arnFormatIncludesClusterName": true
+  }
+}

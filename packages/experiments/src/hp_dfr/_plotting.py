@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import io
+import os
 from pathlib import Path
 from typing import Callable, ParamSpec
 
@@ -24,8 +25,21 @@ from matplotlib.ticker import AutoMinorLocator
 
 from hp_dfr.utils import console
 
-#: Figures (and their source data) live in the project-root ``assets`` directory.
-FIG_DIR: Path = Path(__file__).resolve().parents[4] / "assets"
+
+def _default_fig_dir() -> Path:
+    """Locate the project-root ``assets`` directory in a source checkout.
+
+    In the repository ``_plotting.py`` sits four levels below the root
+    (``packages/experiments/src/hp_dfr``), so the assets directory is
+    ``parents[4] / "assets"``. When the package is installed at a different depth
+    (for example inside a container), set :envvar:`HP_DFR_ASSETS_DIR` instead.
+    """
+    return Path(__file__).resolve().parents[4] / "assets"
+
+
+#: Figures (and their source data) live in the ``assets`` directory. Overridable
+#: via :envvar:`HP_DFR_ASSETS_DIR` for installs whose layout is not the repo's.
+FIG_DIR: Path = Path(os.environ["HP_DFR_ASSETS_DIR"]) if os.environ.get("HP_DFR_ASSETS_DIR") else _default_fig_dir()
 
 # Shared serif/STIX figure style.
 matplotlib.rcParams["font.family"] = "serif"
