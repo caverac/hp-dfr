@@ -1,3 +1,13 @@
+# [1.4.0](https://github.com/caverac/hp-dfr/compare/v1.3.2...v1.4.0) (2026-07-20)
+
+### Bug Fixes
+
+- **preprint:** fixed abstract ([b7e0294](https://github.com/caverac/hp-dfr/commit/b7e0294bdac49405946273cea0272fc50fa9d136))
+
+### Features
+
+- added slides package ([0cc067f](https://github.com/caverac/hp-dfr/commit/0cc067f97be7aa9d26ade5f711d71e4e2b6d1180))
+
 ## [1.3.2](https://github.com/caverac/hp-dfr/compare/v1.3.1...v1.3.2) (2026-07-20)
 
 ### Bug Fixes
