@@ -1,0 +1,52 @@
+name: Deploy Development
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/infra/**"
+      - "packages/experiments/**"
+      - ".github/workflows/deploy-development.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  deploy:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    if: github.repository == 'caverac/hp-dfr'
+    environment: development
+    env:
+      ENVIRONMENT: development
+      AWS_ACCOUNT: ${{ vars.AWS_ACCOUNT_ID }}
+      AWS_REGION: us-east-1
+      GITHUB_REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/DfrPinns-GitHubActions-Role
+          aws-region: us-east-1
+
+      - name: Deploy sweep stack
+        run: yarn workspace @hp-dfr/infra cdk all --require-approval never

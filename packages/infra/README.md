@@ -49,6 +49,26 @@ uv run hp-dfr data merge-shards --which steepness --num-shards 10
 `merge-shards` writes `assets/matched_cost_steepness.json`, which the analysis reads
 like the other sweep data.
 
+## Continuous deployment
+
+The `DfrPinnsOidc` stack creates the IAM role GitHub Actions assumes to deploy, so CI
+holds no long-lived AWS credentials. It is deployed **once, manually**, with admin
+credentials (it only creates an OIDC provider and a role):
+
+```bash
+export ENVIRONMENT=development AWS_ACCOUNT=<account-id>
+# If the account already has a GitHub OIDC provider, reuse it:
+#   export REUSE_GITHUB_OIDC_PROVIDER=true
+yarn workspace @hp-dfr/infra cdk deploy DfrPinnsOidc
+```
+
+Then set the repository variable `AWS_ACCOUNT_ID` (Settings, Secrets and variables,
+Actions) and create a GitHub `development` environment. After that,
+`.github/workflows/deploy-development.yml` deploys `DfrPinnsSweep` automatically on
+pushes to `main` that touch `packages/infra` or `packages/experiments`, and on manual
+dispatch. The role is scoped to the `development` environment only; production is out
+of scope for this project.
+
 ## Cost and teardown
 
 Tasks run at 2 vCPU / 4 GB. The steepness sweep is 80 runs (plain DFR at `2.5x`
