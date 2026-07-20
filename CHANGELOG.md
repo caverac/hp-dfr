@@ -1,3 +1,9 @@
+# [1.3.0](https://github.com/caverac/hp-dfr/compare/v1.2.1...v1.3.0) (2026-07-20)
+
+### Features
+
+- added infrastructure package ([fc933e1](https://github.com/caverac/hp-dfr/commit/fc933e1df206bf48a1b51d4ebcf192ed65ba1b6f))
+
 ## [1.2.1](https://github.com/caverac/hp-dfr/compare/v1.2.0...v1.2.1) (2026-07-17)
 
 ### Bug Fixes
