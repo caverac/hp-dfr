@@ -1,3 +1,9 @@
+## [1.3.1](https://github.com/caverac/hp-dfr/compare/v1.3.0...v1.3.1) (2026-07-20)
+
+### Bug Fixes
+
+- **preprint:** report matched-cost comparison; temper headline to ~2x in 2D, null in steepness ([f605352](https://github.com/caverac/hp-dfr/commit/f605352a9b2892ae420421b8563ed7f422b72817))
+
 # [1.3.0](https://github.com/caverac/hp-dfr/compare/v1.2.1...v1.3.0) (2026-07-20)
 
 ### Features
