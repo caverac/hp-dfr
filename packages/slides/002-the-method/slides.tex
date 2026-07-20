@@ -31,17 +31,34 @@
 % =============================================================================
 
 \begin{frame}{The adjoint as an importance map}
-  Classical finite elements answer ``where does residual matter for my QoI?''
+  Classical finite elements answer ``where does the residual matter for my QoI?''
   with an \important{adjoint} solution $z^*$.
   \medskip
-  \begin{itemize}\itemsep0.5em
-    \item $z^*$ is large where a residual error most affects $J(u)$, and small
-          where it does not.
-    \item The QoI error is then the residual \emph{weighted by that map}:
-          \[
-            J(u^*) - J(u_h) \;=\; \Res(u_h)(z^*) .
-          \]
-  \end{itemize}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \begin{itemize}\itemsep0.5em
+        \item $z^*$ is large where a residual error most affects $J(u)$, and small
+              where it does not.
+        \item The QoI error is then the residual \emph{weighted by that map}:
+              \[
+                J(u^*) - J(u_h) \;=\; \Res(u_h)(z^*) .
+              \]
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{scope}
+          \clip (0,0) rectangle (4,3);
+          \shade[inner color=accent!75, outer color=white] (2.6,1.7) circle (2.2);
+        \end{scope}
+        \draw[thick, neutral] (0,0) rectangle (4,3);
+        \fill[accentdark] (2.6,1.7) circle (1.8pt);
+        \node[accentdark, font=\small, above right=-2pt] at (2.6,1.7) {$x_0$};
+        \node[caption, below=1mm] at (2,0) {$z^*$ over the domain $\Omega$};
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
   \takeaway{Weight the residual by the adjoint, and you localize the error onto
   the quantity you care about. Part 3 proves this identity.}
 \end{frame}

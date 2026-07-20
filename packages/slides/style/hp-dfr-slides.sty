@@ -122,7 +122,12 @@
   badnode/.style={opnode, fill=danger!8, draw=danger},
   localarrow/.style={-Latex, thick, neutral},
   dashedarrow/.style={-Latex, very thick, dashed, accentdark},
-  caption/.style={font=\small\itshape, color=neutral}
+  caption/.style={font=\small\itshape, color=neutral},
+  % neuron/layer primitives for small network schematics
+  neuron/.style={circle, draw=neutral, fill=paper, minimum size=5.5mm, inner sep=0pt},
+  inneuron/.style={neuron, fill=accent!20, draw=accent},
+  outneuron/.style={neuron, fill=success!20, draw=success},
+  netedge/.style={draw=soft, line width=0.3pt}
 }
 
 % -- Callout box ----------------------------------------------------------------

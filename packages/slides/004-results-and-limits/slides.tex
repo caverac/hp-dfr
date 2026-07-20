@@ -31,19 +31,33 @@
 % =============================================================================
 
 \begin{frame}{Goal-orientation reallocates accuracy}
-  On a fixed problem, at the same budget, goal-oriented DFR reaches:
-  \medskip
+  On a fixed problem, at the same budget, goal-oriented DFR piles the network's
+  accuracy onto the QoI, and spends it there:
   \begin{center}
-  \begin{tikzpicture}[node distance=5mm and 18mm]
-    \node[goodnode] (qoi) {QoI error\\\good{smaller}};
-    \node[badnode, right=of qoi] (glob) {global error\\\alert{larger} ($9.8\%$ vs $0.9\%$)};
+  \begin{tikzpicture}
+    % plain DFR: accuracy spread evenly
+    \fill[accent!20] (0,0) rectangle (2.2,1.5);
+    \draw[thick, neutral] (0,0) rectangle (2.2,1.5);
+    \node[caption, below=1mm] at (1.1,0) {plain DFR: uniform};
+    % goal-oriented: accuracy concentrated at the QoI point
+    \begin{scope}[shift={(4.2,0)}]
+      \begin{scope}
+        \clip (0,0) rectangle (2.2,1.5);
+        \shade[inner color=accent!85, outer color=accent!6] (1.35,0.85) circle (1.2);
+      \end{scope}
+      \draw[thick, neutral] (0,0) rectangle (2.2,1.5);
+      \fill[accentdark] (1.35,0.85) circle (1.6pt);
+      \node[accentdark, font=\scriptsize, above=-1pt] at (1.35,0.85) {$x_0$};
+      \node[caption, below=1mm] at (1.1,0) {goal-oriented: piled at $x_0$};
+    \end{scope}
+    \node[neutral] at (3.2,0.75) {\large $\Rightarrow$};
   \end{tikzpicture}
   \end{center}
   \medskip
   \begin{itemize}\itemsep0.5em
     \item It does not solve the problem \emph{better}; it solves a
-          \emph{different} problem, spending the network near the QoI at the
-          expense of everywhere else.
+          \emph{different} problem, buying local accuracy with global: the global
+          error grows to $9.8\%$, against $0.9\%$ for plain DFR.
     \item \alert{Warning for use:} a goal-oriented solution is trustworthy at its
           quantity of interest and nowhere else.
   \end{itemize}

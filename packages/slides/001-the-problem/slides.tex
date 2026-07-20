@@ -37,43 +37,166 @@
 % =============================================================================
 
 \begin{frame}{Solving a PDE with a neural network}
-  We want $u$ solving, say, Poisson's equation $-\Delta u = f$ with $u = 0$ on
-  the boundary.
-  \medskip
-  \begin{itemize}\itemsep0.5em
+  We want $u$ solving Poisson's equation $-\Delta u = f$ with $u = 0$ on
+  $\partial\Omega$.
+  \smallskip
+  \begin{itemize}\itemsep0.35em
     \item Represent the unknown by a network $u_\theta$ with parameters $\theta$.
-    \item Choose $\theta$ so that $u_\theta$ satisfies the equation as closely as
-          possible.
-    \item ``As closely as possible'' is fixed by a \important{loss function}, and
-          the choice of loss decides how faithful the answer is.
+    \item Choose $\theta$ so $u_\theta$ satisfies the equation as closely as
+          possible, where ``closely'' is fixed by a \important{loss function}.
+    \item The choice of loss decides how faithful the answer is.
   \end{itemize}
-  \medskip
+  \smallskip
   \begin{center}
-  \begin{tikzpicture}[node distance=6mm and 10mm]
-    \node[accentnode] (net) {network $u_\theta$};
-    \node[opnode, right=of net] (res) {residual\\$f + \Delta u_\theta$};
-    \node[opnode, right=of res] (loss) {loss};
+  \begin{tikzpicture}[node distance=5mm and 9mm]
+    \node[accentnode, minimum height=7mm] (net) {network $u_\theta$};
+    \node[opnode, minimum height=7mm, right=of net] (res) {residual $f + \Delta u_\theta$};
+    \node[opnode, minimum height=7mm, right=of res] (loss) {loss};
     \draw[localarrow] (net) -- (res);
     \draw[localarrow] (res) -- (loss);
-    \draw[dashedarrow] (loss.south) to[out=-90,in=-90] node[below,caption]{update $\theta$} (net.south);
+    \coordinate (rtn) at ($(loss.south)+(0,-0.45)$);
+    \draw[dashedarrow] (loss.south) -- (rtn) -| (net.south);
+    \node[caption, below] at ($(rtn)!0.5!(rtn -| net.south)$) {update $\theta$};
   \end{tikzpicture}
   \end{center}
+  \takeaway{Two objects to pin down: the \emph{network} $u_\theta$ (next two
+  slides), then the \emph{loss} that scores it (the rest of this deck).}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{What the network is: a function of the coordinate}
+  The \important{trainable network} is a neural field $\tilde{u}_\theta : \R^d \to \R$;
+  every parameter $\theta$ lives in it. The \important{solution} we use is
+  $u_\theta = \varphi\,\tilde{u}_\theta$, this network times a \emph{fixed} cutoff
+  $\varphi$ (built on the next slide).
+  \medskip
+  \begin{columns}[c]
+    \begin{column}{0.46\textwidth}
+      \centering
+      \begin{tikzpicture}[>=Latex]
+        \foreach \y [count=\i] in {0.45,-0.45} \node[inneuron] (I\i) at (0,\y) {};
+        \foreach \y [count=\i] in {1.15,0.45,-0.45,-1.15} \node[neuron] (A\i) at (1.5,\y) {};
+        \foreach \y [count=\i] in {1.15,0.45,-0.45,-1.15} \node[neuron] (B\i) at (3.0,\y) {};
+        \node[outneuron] (O) at (4.5,0) {};
+        \foreach \i in {1,2} \foreach \j in {1,2,3,4} \draw[netedge] (I\i.east) -- (A\j.west);
+        \foreach \i in {1,2,3,4} \foreach \j in {1,2,3,4} \draw[netedge] (A\i.east) -- (B\j.west);
+        \foreach \i in {1,2,3,4} \draw[netedge] (B\i.east) -- (O.west);
+        \node[left=2pt of I1] {\small $x_1$};
+        \node[left=2pt of I2] {\small $x_2$};
+        \node[right=2pt of O] {\small $\tilde{u}_\theta(x)$};
+        \node[caption, align=center] at (2.25,-1.85) {the network $\tilde{u}_\theta$\\ 2D example ($d = 2$)};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \begin{itemize}\itemsep0.5em
+        \item \important{Inputs:} the coordinate $x$, $d$ of them ($1$ in 1D, $2$
+              in 2D). \emph{Not} one input per grid point.
+        \item \important{Output:} one scalar, the raw value $\tilde{u}_\theta(x)$.
+        \item The \emph{same} network is queried at every quadrature point ($150$
+              in 1D, $32 \times 32$ in 2D); those are not extra inputs.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \takeaway{``Degrees of freedom'' later means parameter count, not a mesh: e.g.
+  $105$ for a $2 \to 8 \to 8 \to 1$ net.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{Boundary conditions, built in by construction}
+  The problem asks for $u = 0$ only \emph{on} the boundary $\partial\Omega$;
+  inside, $u$ is the unknown we solve for. We enforce this exactly by
+  construction, with no loss penalty to tune.
+  \smallskip
+  \begin{columns}[c]
+    \begin{column}{0.60\textwidth}
+      \begin{itemize}\itemsep0.4em
+        \item $\tilde{u}_\theta$ is the trainable \important{network} from the last
+              slide; on its own it is nonzero on $\partial\Omega$.
+        \item $\varphi$ is a \important{fixed, known} function of the \emph{same}
+              coordinate $x$ that feeds the network (never trained): zero on
+              $\partial\Omega$, positive inside. On $[0,1]$, $\varphi(x) = x(1-x)$;
+              on the square, $x_1(1-x_1)\,x_2(1-x_2)$.
+        \item The product $u_\theta = \varphi\,\tilde{u}_\theta$ is then zero on
+              $\partial\Omega$ (as $\varphi = 0$) and free inside (as $\varphi > 0$).
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \centering
+      \begin{tikzpicture}[>=Latex]
+        \draw[->] (-0.15,0) -- (3.5,0) node[right, caption] {$x$};
+        \draw[->] (0,-0.15) -- (0,2.15) node[left, caption] {$\varphi$};
+        \draw[thick, accentdark, domain=0:3, samples=80, smooth]
+          plot (\x, {6.4*(\x/3)*(1-\x/3)});
+        \fill[danger] (0,0) circle (1.6pt);
+        \fill[danger] (3,0) circle (1.6pt);
+        \node[caption] at (1.5,1.95) {$\varphi > 0$ inside};
+      \end{tikzpicture}\\[4pt]
+      {\small\itshape\color{neutral} 1D: zero at the ends}
+    \end{column}
+  \end{columns}
+  \takeaway{The fixed cutoff $\varphi$ pins the boundary exactly and for free;
+  the trainable network does all the real work inside.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{First, read the error as a sum of sine waves}
+  We will pick the loss to drive the residual down. Does that drive the
+  \emph{error} down too? To find out, write both in the natural basis for
+  $-\Delta$ on a box: its \important{sine modes}.
+  \smallskip
+  \begin{columns}[c]
+    \begin{column}{0.57\textwidth}
+      \begin{itemize}\itemsep0.5em
+        \item Any function vanishing on $\partial\Omega$ is a sum of sine waves,
+              $\varepsilon(x) = \sum_k a_k \sin(k\pi x)$: one \important{mode} per
+              frequency $k$, with amplitude $a_k$.
+        \item Sines are the \important{eigenfunctions} of the Laplacian,
+              $-\Delta \sin(k\pi x) = (k\pi)^2 \sin(k\pi x)$.
+        \item So $-\Delta$ does not mix modes; it just \emph{scales} mode $k$ by
+              $(k\pi)^2$, and we can reason one mode at a time.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.41\textwidth}
+      \centering
+      \begin{tikzpicture}[>=Latex]
+        \draw[->] (-0.15,0) -- (3.4,0) node[right, caption] {$x$};
+        \draw[thick, accentdark, domain=0:3, samples=100, smooth]
+          plot (\x, {0.62*sin(60*\x)});
+        \draw[thick, danger, densely dashed, domain=0:3, samples=140, smooth]
+          plot (\x, {0.62*sin(180*\x)});
+        \node[caption, accentdark] at (2.75,0.5) {$k=1$};
+        \node[caption, danger] at (0.5,0.9) {$k=3$};
+      \end{tikzpicture}\\[3pt]
+      {\small\itshape\color{neutral} higher $k$, higher frequency}
+    \end{column}
+  \end{columns}
+  \takeaway{In this basis $-\Delta$ is diagonal, scaling mode $k$ by $(k\pi)^2$.
+  That single fact drives both the trap and its fix.}
 \end{frame}
 
 % -----------------------------------------------------------------------------
 \begin{frame}{The trap: a small residual is not a small error}
-  Physics-informed networks (PINNs) minimize the residual pointwise:
+  Back to the loss. The obvious choice squares the pointwise residual at sample
+  points, $\frac{1}{N}\sum_i |f(x_i) + \Delta u_\theta(x_i)|^2$, which is a
+  \important{PINN}. See what it does to our modes.
+  \medskip
+  Write the error $\varepsilon = u_\theta - u^*$. Since $-\Delta u^* = f$, the
+  residual \emph{is} the error through the operator, $r = -\Delta\varepsilon$, so
+  it scales mode $k$ by $(k\pi)^2$:
   \[
-    \frac{1}{N}\sum_i \bigl| f(x_i) + \Delta u_\theta(x_i) \bigr|^2 .
+    \varepsilon = a\,\sin(k\pi x)
+    \quad\Longrightarrow\quad
+    \norm{\varepsilon}_{L^2} \propto |a|,
+    \qquad
+    \norm{r}_{L^2} = (k\pi)^2\,|a| .
   \]
-  \begin{itemize}\itemsep0.5em
-    \item The \important{size} of the residual is not proportional to the
-          \important{size} of the error.
-    \item A residual small in $L^2$ can still hide a solution off in the places
-          that matter, because differentiation amplifies high-frequency wiggles.
+  \begin{itemize}\itemsep0.3em
+    \item \important{Same error, wildly different residual:} at $k = 1$ versus
+          $k = 10$ the error is identical, yet the residual differs by $100\times$.
   \end{itemize}
-  \takeaway{To control the error we must measure the residual in the right norm,
-  not just make it pointwise small.}
+  \takeaway{The pointwise residual over-weights high-frequency error by $(k\pi)^2$,
+  so making it small is not the same as making the error small. We need a norm
+  that corrects for this.}
 \end{frame}
 
 % =============================================================================
@@ -81,19 +204,23 @@
 % =============================================================================
 
 \begin{frame}{The DFR fix: the dual norm of the weak residual}
-  Taylor, Pardo and Muga (2023): measure the weak residual in the
-  \important{$H^{-1}$ dual norm}.
+  Taylor, Pardo and Muga (2023): stop scoring the pointwise residual; measure the
+  residual in the \important{$H^{-1}$ dual norm} instead (its precise weak form
+  waits for Part 3).
   \medskip
   \begin{itemize}\itemsep0.5em
-    \item On a box, the sine functions diagonalize the Laplacian, so the dual
-          norm is a weighted sum of the residual's sine coefficients,
+    \item We saw these sine modes diagonalize $-\Delta$. The dual norm simply
+          \emph{reweights} each mode of the residual by $1/\lambda_k$,
           \[
             \norm{\Res(u_\theta)}_{V^*}^2 = \sum_k \frac{|\hat{\Res}_k|^2}{\lambda_k},
             \qquad \lambda_k = \sum_i (\pi k_i / L_i)^2 ,
           \]
-          computed fast by the Discrete Sine Transform.
-    \item In $d \ge 2$ the eigenvalue couples the axes through the \emph{sum} of
+          with coefficients $\hat{\Res}_k$ from a fast Discrete Sine Transform.
+    \item In $d \ge 2$ the weight couples the axes through the \emph{sum} of
           squared frequencies, not a product of one-dimensional weights.
+    \item \good{The point:} dividing by $\lambda_k = (k\pi)^2$ undoes exactly the
+          amplification behind the trap, so $\norm{\Res}_{V^*}$ tracks the energy
+          error instead of over-weighting high frequencies.
   \end{itemize}
 \end{frame}
 
@@ -120,8 +247,9 @@
 % =============================================================================
 
 \begin{frame}{Global error is often not what we want}
-  In practice the object of interest is a \important{single functional} of the
-  solution, a quantity of interest (QoI):
+  DFR gives tight, two-sided control of the \emph{whole-field} energy error. Often
+  that is more than we need: the object we actually care about is one
+  \important{functional} of the solution, a quantity of interest (QoI):
   \medskip
   \begin{center}
   \begin{tikzpicture}[node distance=4mm and 12mm]
