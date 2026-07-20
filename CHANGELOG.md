@@ -1,3 +1,9 @@
+## [1.4.1](https://github.com/caverac/hp-dfr/compare/v1.4.0...v1.4.1) (2026-07-20)
+
+### Bug Fixes
+
+- **slides:** fixed discussion workflow ([d410b16](https://github.com/caverac/hp-dfr/commit/d410b161ac1ae26927571cec194a30f15859fdba))
+
 # [1.4.0](https://github.com/caverac/hp-dfr/compare/v1.3.2...v1.4.0) (2026-07-20)
 
 ### Bug Fixes
