@@ -1,3 +1,9 @@
+## [1.2.1](https://github.com/caverac/hp-dfr/compare/v1.2.0...v1.2.1) (2026-07-17)
+
+### Bug Fixes
+
+- **preprint:** clear submission float warnings; justify matched-budget benchmark ([b33b171](https://github.com/caverac/hp-dfr/commit/b33b17119bc8480ae6cc45b66f296a75b0e1b5a1))
+
 # [1.2.0](https://github.com/caverac/hp-dfr/compare/v1.1.0...v1.2.0) (2026-07-17)
 
 ### Features
