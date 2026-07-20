@@ -40,11 +40,13 @@
 
 \title{Goal-Oriented Deep Fourier Residual Methods}
 
-\author{Carlos Vera-Ciro}
+\author{Carlos Vera-Ciro\corref{cor1}}
+\ead{caverac@gmail.com}
+\cortext[cor1]{Corresponding author.}
 \affiliation{organization={Independent Researcher}}
 
 \begin{abstract}
-The Deep Fourier Residual (DFR) method of Taylor, Pardo, and Muga~\citep{taylor2023deep} minimizes the $H^{-1}$ dual norm of the weak PDE residual, a loss that is equivalent to the $H^1$ energy-norm error for well-posed problems. In many applications, however, the goal is not the global error but a quantity of interest (QoI): a point value, a subdomain average, or a boundary flux. We introduce a goal-oriented DFR method that applies the dual-weighted residual (DWR) framework to the DFR dual-norm loss. A primal network and an adjoint network are trained together; the primal network minimizes a QoI-weighted residual functional $|\langle R(u_h), z_h \rangle|$, while the adjoint network is trained to solve its own DFR problem, so that it approximates the true adjoint rather than merely driving the pairing to zero. Our main theoretical result is a goal-oriented counterpart of the DFR error--loss equivalence: the QoI-weighted loss, plus a computable remainder, controls the error $|J(u) - J(u_h)|$ in the quantity of interest. Unlike the DFR estimate, the bound is one-sided; we verify it empirically and find it holds on every run, at a median of ten times the true error. We also find that the QoI-weighted loss must not be read as an error estimator: because training minimizes it directly, it falls five orders of magnitude below the error that remains, and the bound is carried entirely by its remainder. Empirically, the method trades global accuracy for accuracy in the quantity of interest: at a matched training budget it reaches a QoI error roughly fifteen times smaller than plain DFR while its global energy error is about an order of magnitude larger, on every seed. This reallocation helps most where plain DFR leaves QoI-relevant residual unresolved, but its size must be judged at equal compute, since goal-orientation trains a second network. At a matched training budget the two-dimensional QoI error is $2.3$ to $3.9$ times smaller; at matched cost, with plain DFR given proportionally more training, the improvement falls to about a factor of two (a paired median of $2.2$, bootstrap $95\%$ interval $[1.2, 4.6]$, on $28$ of $40$ runs), and in a sweep over problem difficulty it disappears into the seed noise. The equal-cost benefit is therefore modest and setting-dependent, though genuine in the two-dimensional network-size setting. The theory predicts none of this, and we say where it falls short.
+The Deep Fourier Residual (DFR) method minimizes the $H^{-1}$ dual norm of the weak PDE residual, a loss equivalent to the $H^1$ energy-norm error. In many applications the goal is not the global error but a quantity of interest (QoI): a point value, an average, or a flux. We introduce a goal-oriented DFR method that applies the dual-weighted residual framework to the DFR loss: a primal network and an adjoint network are trained together, the primal minimizing a QoI-weighted residual while the adjoint solves its own DFR problem, so that it approximates the true adjoint rather than merely zeroing the pairing. Our main result is a computable, one-sided bound on the QoI error, verified on every run at about ten times the true error. We also find that the QoI-weighted loss must not be read as an error estimator: training drives it orders of magnitude below the error that remains, and the bound is carried by its remainder. Empirically, the method reallocates accuracy from the global solution to the quantity of interest. Its size must be judged at equal compute, since goal-orientation trains a second network: at a matched training budget the two-dimensional QoI error is $2.3$ to $3.9$ times smaller, but at matched cost the improvement falls to about a factor of two (paired median $2.2$, $95\%$ interval $[1.2, 4.6]$) in the network-size setting and vanishes into the seed noise in a sweep over problem difficulty. The equal-cost benefit is modest and setting-dependent, though genuine; the theory predicts none of it.
 \end{abstract}
 
 \begin{keyword}
@@ -439,7 +441,7 @@ One detail here is easy to dismiss as noise and turns out not to be. At the larg
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{dfr-saturation-1d}
+\includegraphics[width=0.80\textwidth]{dfr-saturation-1d}
 \caption{QoI error versus primal-network degrees of freedom (DOF) on 1D Poisson problems (smooth, top; peaked, bottom). Plain DFR reaches a QoI error of about $3 \times 10^{-5}$ at extremely small network sizes and does not improve on it as the network grows. Goal-oriented DFR (GO-DFR) is the worse method at small and moderate sizes, at either loss weight, so the weight used by the 2D experiments ($\alpha = \beta = 5$) does not by itself manufacture an advantage. At the largest networks $\alpha = \beta = 5$ overtakes the baseline on both problems, the same reallocation the 2D experiments show. Markers show medians over random seeds; bands span the seed min--max.}
 \label{fig:dfr-saturation}
 \end{figure}
@@ -457,7 +459,7 @@ Neither method is monotone in the degrees of freedom, plain DFR being at its bes
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{dfr-vs-go-2d}
+\includegraphics[width=0.80\textwidth]{dfr-vs-go-2d}
 \caption{QoI error versus primal-network degrees of freedom (DOF) on the 2D Poisson problem with an arctan bump, at a matched training budget. The goal-oriented DFR method (GO-DFR), which holds the adjoint fixed in the goal term and weights the dual norm by the coupled eigenvalues $\lambda_k = \sum_i (\pi k_i / L_i)^2$, redirects the network's accuracy toward the support of the QoI. It wins 33 of the 40 runs and reduces the median QoI error by 2.3 to 3.9 times at matched primal-network DOF, a geometric mean of 3.1 times. These are matched-\emph{budget} figures and an upper bound: the baseline is not converged at this budget (Section~\ref{sec:results-tradeoff}), and GO-DFR trains a second network, so at matched cost the advantage roughly halves (Table~\ref{tab:matched-cost}). Markers show medians over random seeds; bands span the seed min--max.}
 \label{fig:dfr-vs-go-2d}
 \end{figure}
@@ -493,7 +495,7 @@ So at matched budget the sweep shows a clear resolution-limited advantage. Wheth
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{dfr-vs-go-steepness}
+\includegraphics[width=0.80\textwidth]{dfr-vs-go-steepness}
 \caption{QoI error versus the solution's steepness $k$ at fixed network size ($105$ degrees of freedom, top; $337$, bottom) and fixed discretization, so that $k$ is the only variable, at a matched training budget. Plain DFR changes little while the problem is easy and then degrades sharply, by a factor of $84$ between $k=2$ and $k=16$ at $105$ degrees of freedom; goal-oriented DFR degrades by a factor of $11$ over the same range, so the gap opens as the problem hardens and the two curves cross near $k \approx 5$. Below the crossover, at $k=4$ and $105$ degrees of freedom, goal-orientation is the worse method. At $337$ degrees of freedom it is ahead everywhere, including at $k=2$; there the advantage comes from the baseline being under-converged at the shared budget (Section~\ref{sec:results-tradeoff}) rather than from resolution limitation. This is a matched-budget comparison; at equal cost most of the advantage closes (Section~\ref{sec:results-matched-cost}). Markers show medians over ten random seeds; bands span the seed min--max.}
 \label{fig:steepness}
 \end{figure}
@@ -551,7 +553,7 @@ This has a practical consequence worth stating plainly. A reader who took $\math
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=0.85\textwidth]{bound-verification}
+\includegraphics[width=0.80\textwidth]{bound-verification}
 \caption{Verification of the QoI error bound~\eqref{eq:main} on the goal-oriented runs of the network-size sweeps (1D, top; 2D, bottom). The abscissa is the QoI error actually committed; the dashed diagonal is equality. The bound (circles) lies above the diagonal on every run, exceeding the true error by a median factor of $9.8$ in 1D and $17.7$ in 2D; across all 168 runs of the study, including the steepness sweep, it holds without exception. The goal term $\mathcal{L}_{\mathrm{QoI}}$ alone (squares) lies far \emph{below} the diagonal: training minimizes it directly, driving it some five orders of magnitude beneath the error that remains, so it cannot serve as an error estimator and the bound is carried entirely by its remainder.}
 \label{fig:bound}
 \end{figure}
@@ -618,6 +620,22 @@ All code used in this paper is available in the accompanying repository, \url{ht
 \section*{Acknowledgments}
 
 The author thanks the MATHMODE group for making the original DFR implementations publicly available.
+
+\section*{CRediT authorship contribution statement}
+
+\textbf{Carlos Vera-Ciro:} Conceptualization, Methodology, Software, Formal analysis, Investigation, Writing -- original draft, Writing -- review and editing.
+
+\section*{Declaration of competing interest}
+
+The author declares that he has no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+
+\section*{Funding}
+
+This research received no specific grant from any funding agency in the public, commercial, or not-for-profit sectors.
+
+\section*{Data availability}
+
+All code, saved sweep data, and scripts to regenerate every figure are openly available in the accompanying repository, \url{https://github.com/caverac/hp-dfr}, with documentation at \url{https://caverac.github.io/hp-dfr/}.
 
 \bibliography{references}
 
