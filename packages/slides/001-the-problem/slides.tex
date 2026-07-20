@@ -1,0 +1,144 @@
+\documentclass[11pt,aspectratio=169]{beamer}
+\usepackage{hp-dfr-slides}
+\graphicspath{{../../../assets/}}
+
+\title{From PINNs to a quantity of interest}
+\subtitle{Goal-Oriented Deep Fourier Residual methods}
+\author{Carlos Vera-Ciro}
+\institute{Goal-Oriented DFR series \textbar\ Part 1}
+\date{}
+
+\begin{document}
+
+\begin{frame}[plain,noframenumbering]
+  \titlepage
+\end{frame}
+
+% =============================================================================
+\begin{frame}{About this series}
+  Four short decks, building the idea and then testing it honestly.
+  \medskip
+  \begin{enumerate}\itemsep0.55em
+    \item[\important{1.}] \important{The problem} (this deck): why the residual
+          norm matters, and why global error is often the wrong target.
+    \item[\important{2.}] \important{The method}: goal-oriented DFR, a primal and
+          an adjoint network trained together.
+    \item[\important{3.}] \important{The theory}: the error representation and the
+          bound, with proofs.
+    \item[\important{4.}] \important{Results and limits}: what the method buys at
+          equal compute, and where it does not help.
+  \end{enumerate}
+  \takeaway{Audience: anyone comfortable with PDEs and neural networks. No prior
+  DFR needed.}
+\end{frame}
+
+% =============================================================================
+\section{Solving PDEs with networks}
+% =============================================================================
+
+\begin{frame}{Solving a PDE with a neural network}
+  We want $u$ solving, say, Poisson's equation $-\Delta u = f$ with $u = 0$ on
+  the boundary.
+  \medskip
+  \begin{itemize}\itemsep0.5em
+    \item Represent the unknown by a network $u_\theta$ with parameters $\theta$.
+    \item Choose $\theta$ so that $u_\theta$ satisfies the equation as closely as
+          possible.
+    \item ``As closely as possible'' is fixed by a \important{loss function}, and
+          the choice of loss decides how faithful the answer is.
+  \end{itemize}
+  \medskip
+  \begin{center}
+  \begin{tikzpicture}[node distance=6mm and 10mm]
+    \node[accentnode] (net) {network $u_\theta$};
+    \node[opnode, right=of net] (res) {residual\\$f + \Delta u_\theta$};
+    \node[opnode, right=of res] (loss) {loss};
+    \draw[localarrow] (net) -- (res);
+    \draw[localarrow] (res) -- (loss);
+    \draw[dashedarrow] (loss.south) to[out=-90,in=-90] node[below,caption]{update $\theta$} (net.south);
+  \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{The trap: a small residual is not a small error}
+  Physics-informed networks (PINNs) minimize the residual pointwise:
+  \[
+    \frac{1}{N}\sum_i \bigl| f(x_i) + \Delta u_\theta(x_i) \bigr|^2 .
+  \]
+  \begin{itemize}\itemsep0.5em
+    \item The \important{size} of the residual is not proportional to the
+          \important{size} of the error.
+    \item A residual small in $L^2$ can still hide a solution off in the places
+          that matter, because differentiation amplifies high-frequency wiggles.
+  \end{itemize}
+  \takeaway{To control the error we must measure the residual in the right norm,
+  not just make it pointwise small.}
+\end{frame}
+
+% =============================================================================
+\section{The Deep Fourier Residual method}
+% =============================================================================
+
+\begin{frame}{The DFR fix: the dual norm of the weak residual}
+  Taylor, Pardo and Muga (2023): measure the weak residual in the
+  \important{$H^{-1}$ dual norm}.
+  \medskip
+  \begin{itemize}\itemsep0.5em
+    \item On a box, the sine functions diagonalize the Laplacian, so the dual
+          norm is a weighted sum of the residual's sine coefficients,
+          \[
+            \norm{\Res(u_\theta)}_{V^*}^2 = \sum_k \frac{|\hat{\Res}_k|^2}{\lambda_k},
+            \qquad \lambda_k = \sum_i (\pi k_i / L_i)^2 ,
+          \]
+          computed fast by the Discrete Sine Transform.
+    \item In $d \ge 2$ the eigenvalue couples the axes through the \emph{sum} of
+          squared frequencies, not a product of one-dimensional weights.
+  \end{itemize}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{DFR's guarantee}
+  \begin{block}{Error-loss equivalence (Taylor, Pardo, Muga 2023)}
+    For a well-posed problem there are constants $\gamma, M > 0$ with
+    \[
+      \frac{1}{M}\,\norm{\Res(w)}_{V^*}
+        \;\le\; \norm{u^* - w}_U
+        \;\le\; \frac{1}{\gamma}\,\norm{\Res(w)}_{V^*} .
+    \]
+  \end{block}
+  \medskip
+  \begin{itemize}\itemsep0.5em
+    \item \good{Two-sided:} the loss bounds the error above \emph{and} below.
+    \item Drive the DFR loss down, and the energy-norm error goes down with it.
+    \item We prove this, and everything that follows, in Part 3.
+  \end{itemize}
+\end{frame}
+
+% =============================================================================
+\section{Quantities of interest}
+% =============================================================================
+
+\begin{frame}{Global error is often not what we want}
+  In practice the object of interest is a \important{single functional} of the
+  solution, a quantity of interest (QoI):
+  \medskip
+  \begin{center}
+  \begin{tikzpicture}[node distance=4mm and 12mm]
+    \node[opnode] (pt) {a point value\\$u(x_0)$};
+    \node[opnode, right=of pt] (avg) {a subdomain\\average};
+    \node[opnode, right=of avg] (flux) {a boundary\\flux};
+  \end{tikzpicture}
+  \end{center}
+  \medskip
+  \begin{itemize}\itemsep0.5em
+    \item A small global error is \emph{sufficient} but not \emph{necessary} for
+          an accurate QoI.
+    \item Driving the global error to a tight tolerance is wasteful when only
+          $J(u)$ matters.
+  \end{itemize}
+  \takeaway{We want a loss aimed at the quantity of interest, not the whole
+  field. That is Part 2.}
+\end{frame}
+
+\end{document}

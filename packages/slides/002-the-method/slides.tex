@@ -1,0 +1,131 @@
+\documentclass[11pt,aspectratio=169]{beamer}
+\usepackage{hp-dfr-slides}
+\graphicspath{{../../../assets/}}
+
+\title{Goal-oriented DFR}
+\subtitle{A primal and an adjoint network, trained together}
+\author{Carlos Vera-Ciro}
+\institute{Goal-Oriented DFR series \textbar\ Part 2}
+\date{}
+
+\begin{document}
+
+\begin{frame}[plain,noframenumbering]
+  \titlepage
+\end{frame}
+
+% =============================================================================
+\begin{frame}{Where we are}
+  \begin{itemize}\itemsep0.6em
+    \item Part 1: DFR gives a loss, the $H^{-1}$ dual norm of the residual, that
+          is equivalent to the global energy error.
+    \item But we often want a single \important{quantity of interest} $J(u)$, and
+          global control is indirect and wasteful.
+    \item This deck: weight the DFR loss toward $J$, using the dual-weighted
+          residual (DWR) idea.
+  \end{itemize}
+\end{frame}
+
+% =============================================================================
+\section{The dual-weighted residual idea}
+% =============================================================================
+
+\begin{frame}{The adjoint as an importance map}
+  Classical finite elements answer ``where does residual matter for my QoI?''
+  with an \important{adjoint} solution $z^*$.
+  \medskip
+  \begin{itemize}\itemsep0.5em
+    \item $z^*$ is large where a residual error most affects $J(u)$, and small
+          where it does not.
+    \item The QoI error is then the residual \emph{weighted by that map}:
+          \[
+            J(u^*) - J(u_h) \;=\; \Res(u_h)(z^*) .
+          \]
+  \end{itemize}
+  \takeaway{Weight the residual by the adjoint, and you localize the error onto
+  the quantity you care about. Part 3 proves this identity.}
+\end{frame}
+
+% =============================================================================
+\section{The construction}
+% =============================================================================
+
+\begin{frame}{Two networks}
+  Train a \important{primal} network and an \important{adjoint} network together.
+  \medskip
+  \begin{center}
+  \begin{tikzpicture}[node distance=7mm and 14mm]
+    \node[accentnode] (u) {primal $u_\theta$};
+    \node[accentnode, below=of u] (z) {adjoint $z_\phi$};
+    \coordinate (mid) at ($(u)!0.5!(z)$);
+    \node[opnode, right=16mm of mid] (pair) {$\bigl|\inner{\Res(u_\theta)}{z_\phi}\bigr|$\\QoI-weighted loss};
+    \draw[localarrow] (u.east) -- (pair.west);
+    \draw[localarrow] (z.east) -- (pair.west);
+  \end{tikzpicture}
+  \end{center}
+  \medskip
+  \begin{itemize}\itemsep0.4em
+    \item The primal minimizes the QoI-weighted residual, putting its accuracy
+          where the adjoint says it matters.
+    \item The adjoint solves its \emph{own} DFR problem, so it genuinely
+          approximates $z^*$.
+  \end{itemize}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{The subtlety that makes it work: a stop-gradient}
+  The goal term $\bigl|\inner{\Res(u_\theta)}{z_\phi}\bigr|$ is a single scalar.
+  If the \important{adjoint} were allowed to descend it too:
+  \medskip
+  \begin{itemize}\itemsep0.5em
+    \item[\alert{$\times$}] the optimizer would drive the pairing to zero
+          trivially, by making $z_\phi$ \emph{orthogonal} to the residual,
+    \item[\alert{$\times$}] without $z_\phi$ approximating the true adjoint at
+          all. The localization is lost.
+  \end{itemize}
+  \medskip
+  \good{Fix:} hold the adjoint fixed in the goal term (a stop-gradient). The
+  adjoint is trained \emph{only} by its own residual $\norm{\Resad(z_\phi)}_{U^*}^2$;
+  the primal is guided by the QoI-weighted term.
+  \takeaway{Stop-gradient stops the adjoint from cheating. The difference between
+  a working method and a degenerate one.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{The training objective}
+  \[
+    \mathcal{L}(\theta,\phi) =
+      \underbrace{\bigl|\Res(u_\theta)(\bar{z}_\phi)\bigr|}_{\text{goal term (primal only)}}
+      \;+\; \beta\,\underbrace{\norm{\Res(u_\theta)}_{V^*}^2}_{\text{primal DFR}}
+      \;+\; \alpha\,\underbrace{\norm{\Resad(z_\phi)}_{U^*}^2}_{\text{adjoint DFR}}
+  \]
+  \medskip
+  \begin{itemize}\itemsep0.5em
+    \item $\bar{z}_\phi$: adjoint held fixed (the stop-gradient).
+    \item The pairing $\Res(u_\theta)(z_\phi) = \int_\Omega (f + \Delta u_\theta)\,
+          z_\phi\, dx$ is evaluated on the same grid DFR already uses; no extra
+          quadrature.
+    \item Same spectral evaluation and boundary-cutoff construction as plain DFR.
+          The only new ingredients are the adjoint and the goal term.
+  \end{itemize}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{The algorithm, in one loop}
+  \begin{enumerate}\itemsep0.5em
+    \item Precompute the DST matrix and the $H^{-1}$ weights.
+    \item Each step, by DST, form the residual coefficients $\hat{\Res}(u_\theta)$
+          and $\hat{\Resad}(z_\phi)$.
+    \item Primal loss $\mathcal{L}_u = |\Res(u_\theta)(\bar{z}_\phi)|
+          + \beta\,\norm{\Res(u_\theta)}_{V^*}^2$ updates $\theta$.
+    \item Adjoint loss $\mathcal{L}_z = \alpha\,\norm{\Resad(z_\phi)}_{U^*}^2$
+          updates $\phi$.
+    \item Adam, then an L-BFGS polish.
+  \end{enumerate}
+  \medskip
+  Boundary conditions are enforced by a cutoff: $u_\theta = \varphi\,\tilde{u}_\theta$,
+  with $\varphi$ vanishing on $\partial\Omega$; likewise for $z_\phi$.
+  \takeaway{Next: what this construction lets us prove.}
+\end{frame}
+
+\end{document}
