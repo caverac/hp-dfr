@@ -43,26 +43,24 @@ remains, so the bound is carried by its remainder.
 ## Main result
 
 Goal-orientation **reallocates accuracy from the global solution to the quantity of
-interest**: at a matched training budget it reaches a QoI error about **15x smaller** than
-plain DFR (Section 6.3) while its global energy error is about an **order of magnitude
-larger**, on every seed. It therefore
-helps wherever plain DFR leaves QoI-relevant residual unresolved, and hurts where it does
-not. Sweeping the steepness `k` at fixed network and discretization shows both sides:
+interest**: it reaches a smaller QoI error while its global energy error is about an order
+of magnitude larger, on every seed. The size of that gain has to be judged at equal
+compute, since goal-orientation trains a second (adjoint) network. At a matched training
+_budget_ its QoI error is 2.3 to 3.9 times smaller in 2D; at matched _cost_, with plain DFR
+given `2.5x` the training to compensate, that halves and splits by setting:
 
-- **The problem is too hard for the network** (`k >= 8`): plain DFR's error grows **84x**
-  from `k=2` to `k=16` while goal-orientation's grows **11x**, so goal-orientation ends up
-  **6 to 15 times** more accurate.
-- **The training budget is too small** (easy problem, larger network): plain DFR has not
-  converged, and goal-orientation extracts more QoI accuracy from the same budget (**~15x**).
-- **Neither** (easy problem, small network): goal-orientation is **2.4x worse**. The method
-  can hurt.
+- **2D network-size sweep: the advantage survives.** Goal-orientation is about **2x** more
+  accurate (paired median **2.2x**, 95% CI **[1.2, 4.6]**), winning **28 of 40** runs.
+- **Steepness sweep: the advantage does not survive.** Goal-orientation wins **38 of 80**
+  runs, paired median **0.92x** (CI [0.69, 1.85]); it disappears into the seed noise. The
+  multi-fold matched-budget advantages here were largely the baseline being under-trained.
 
-Two honest caveats. Plain DFR is **not trained to convergence** at the shared budget (its
-error is still falling at 10x the steps), so these are matched-_budget_, not matched-accuracy
-comparisons, and the magnitudes on easy problems would shrink under a longer schedule; the
-mechanism and the large-`k` advantage do not depend on it. And goal-oriented solutions are
-accurate at the QoI but ~10x worse globally, so they are trustworthy at the quantity of
-interest and nowhere else. The theory predicts none of this.
+So the honest headline is a **modest, setting-dependent ~2x improvement at equal cost**, not
+the larger matched-budget figures (which the paper keeps as an upper bound). Two caveats
+that do not go away: plain DFR is not trained to convergence even at `2.5x` the budget, so a
+fully-converged comparison is still out of reach; and goal-oriented solutions are accurate
+at the QoI but ~10x worse globally, so they are trustworthy at the quantity of interest and
+nowhere else. The theory predicts none of this.
 
 The figures, numbers, and reproduction commands are in the
 [documentation](https://caverac.github.io/hp-dfr/docs/preprint/phase3-goal-oriented#results).

@@ -18,8 +18,8 @@ functional of the solution &mdash; a **quantity of interest** (QoI) such as a po
 value, an average, or a flux &mdash; goal-oriented DFR weights the loss toward that
 functional. It trains a **primal** network $u_h$ together with an **adjoint** network
 $z_h$ and minimizes a QoI-weighted residual. The construction comes with a theorem
-bounding the QoI error, and the experiments show that it improves QoI accuracy in the
-resolution-limited regime, and not otherwise.
+bounding the QoI error, and the experiments show that at equal computational cost it
+improves QoI accuracy by a modest, setting-dependent factor of about two.
 
 ## Construction
 
@@ -54,26 +54,28 @@ means the bound is weakest in the very regime where goal-orientation proves usef
 
 ## What the experiments establish
 
-The comparison against plain DFR is run at matched network sizes on Poisson problems
-in one and two dimensions.
+Goal-orientation reallocates accuracy toward the QoI wherever plain DFR leaves
+QoI-relevant residual unresolved. Its size has to be judged at equal compute, since
+goal-orientation trains a second network, so the honest comparison gives plain DFR
+`2.5x` the training to match wall-clock.
 
-- **Resolution-limited: a large advantage.** As the solution sharpens at a fixed
-  network, plain DFR's error grows 84 times while goal-orientation's grows 11.
-  Goal-orientation ends up 6 to 15 times more accurate, winning 9 of 10 runs.
+- **2D network-size sweep: the advantage survives.** At matched cost goal-orientation is
+  about twice as accurate on the point QoI (paired median 2.2 times, 95% CI [1.2, 4.6]),
+  winning 28 of 40 runs. At matched budget this looked like 2.3 to 3.9 times, which the
+  paper keeps as an upper bound.
 
-- **Under-trained baseline: also an advantage.** On the _easiest_ problem tested,
-  goal-orientation is still 15 times more accurate. This is not resolution limitation
-  and not an accuracy floor: plain DFR has simply not converged at the shared training
-  budget, and goal-orientation extracts more QoI accuracy from the same budget.
+- **Steepness sweep: the advantage does not survive.** Varying problem difficulty at a
+  fixed network, goal-orientation wins only 38 of 80 runs at matched cost (paired median
+  0.92 times, CI [0.69, 1.85], straddling unity). The multi-fold matched-budget advantage
+  here was largely the baseline being under-trained; once plain DFR is given comparable
+  compute, it closes.
 
-- **Neither: a real loss.** On easy problems at small networks, goal-orientation is 2.4
-  times _worse_, winning 2 of 10 runs. The method is not uniformly beneficial.
+- **A real loss.** On easy problems at small networks goal-orientation is worse. The
+  method is not uniformly beneficial, and goal-oriented solutions are accurate at the QoI
+  but roughly an order of magnitude worse globally.
 
-What unites the wins is that goal-orientation reallocates accuracy toward the QoI (about
-15 times better there, roughly an order of magnitude worse globally) wherever plain DFR leaves
-QoI-relevant residual unresolved. Because the baseline is not trained to convergence,
-these are matched-budget rather than matched-accuracy comparisons. The theory predicts
-none of it.
+The honest headline is a modest, setting-dependent gain of about a factor of two at equal
+cost. The theory predicts none of it.
 
 Both cases, with the figures and the exact commands that reproduce them, are on the
 [Method and Results](/docs/preprint/phase3-goal-oriented#results) page.

@@ -87,14 +87,15 @@ alone is not an error estimator: training drives it about five orders of magnitu
 the error that remains.
 
 The experiments show goal-orientation _reallocating_ accuracy from the global solution
-to the quantity of interest: at a matched training budget it reaches a QoI error about
-15 times smaller than plain DFR while its global energy error is about an order of
-magnitude larger.
-It helps wherever plain DFR leaves QoI-relevant residual unresolved, whether because the
-problem is too hard for the network (error 6 to 15 times smaller) or because the shared
-budget is too small to converge the baseline; it hurts, by 2.4 times, on easy problems
-where the baseline is already accurate. Plain DFR is not trained to convergence at that
-budget, so the magnitudes are matched-budget rather than matched-accuracy. The
+to the quantity of interest: it reaches a smaller QoI error while its global energy
+error is about an order of magnitude larger. Its size has to be judged at equal compute,
+since goal-orientation trains a second network. At a matched training _budget_ the 2D QoI
+error is 2.3 to 3.9 times smaller; at matched _cost_, with plain DFR given more training
+to compensate, that halves and splits by setting: a modest but real ~2x improvement in
+the 2D network-size sweep (paired median 2.2x, 95% CI [1.2, 4.6], winning 28 of 40 runs),
+and no reliable improvement in a sweep over problem difficulty, where it disappears into
+the seed noise. The honest headline is therefore a modest, setting-dependent gain at
+equal cost, with the larger matched-budget figures reported as an upper bound. The
 [results](/docs/preprint/phase3-goal-oriented#results) present each case, with the
 command that reproduces each figure.
 

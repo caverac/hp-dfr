@@ -190,10 +190,11 @@ the smallest networks and only reaches $10^{-5}$ as the width grows.
 <figure class="scientific">
   <img src={useBaseUrl('/img/figures/dfr-vs-go-2d.png')} alt="QoI error versus degrees of freedom in 2D for plain DFR and goal-oriented DFR" />
   <figcaption>QoI error versus primal-network degrees of freedom on the 2D arctan-bump
-  Poisson problem. Goal-oriented DFR improves the median point-QoI error by 2.3 to 3.9
-  times (3.1 times on a geometric mean) at matched primal-network degrees of freedom,
-  winning 33 of 40 runs. Markers are medians over ten random seeds; bands span the seed
-  min&ndash;max.</figcaption>
+  Poisson problem, at a matched training _budget_. Goal-oriented DFR improves the median
+  point-QoI error by 2.3 to 3.9 times (3.1 times on a geometric mean), winning 33 of 40
+  runs. These are upper-bound figures: the baseline is not converged at this budget, and
+  at matched cost the advantage roughly halves (see "At matched cost" below). Markers are
+  medians over ten random seeds; bands span the seed min&ndash;max.</figcaption>
 </figure>
 
 Reproduce with:
@@ -209,25 +210,21 @@ uv run hp-dfr figures
 The first command writes `assets/m3_2d_data.json`; the second reads it and writes
 `assets/dfr-vs-go-2d.png` and `.pdf`.
 
-In this resolution-limited regime goal-orientation is the more accurate method at
-every size, improving the median QoI error by 1.2 to 5.3 times (a geometric mean of
-2.7) and winning on ten of the twelve configurations. Neither method is monotone in
-the degrees of freedom, and the near-parity at 337 reflects the goal-oriented method
-degrading rather than the baseline improving:
+At matched budget goal-orientation is the more accurate method at every size, improving
+the median QoI error by 2.3 to 3.9 times (a geometric mean of 3.1) and winning 33 of the
+40 runs over ten seeds:
 
-| Degrees of freedom |          Plain DFR |      Goal-oriented | Improvement |
-| -----------------: | -----------------: | -----------------: | ----------: |
-|                105 | $2.4\times10^{-4}$ | $4.5\times10^{-5}$ | $5.3\times$ |
-|                337 | $1.6\times10^{-5}$ | $1.3\times10^{-5}$ | $1.2\times$ |
-|                697 | $7.9\times10^{-6}$ | $2.8\times10^{-6}$ | $2.8\times$ |
-|               1185 | $1.0\times10^{-5}$ | $3.2\times10^{-6}$ | $3.1\times$ |
+| Degrees of freedom |          Plain DFR |      Goal-oriented | Improvement | GO wins |
+| -----------------: | -----------------: | -----------------: | ----------: | ------: |
+|                105 | $1.5\times10^{-4}$ | $3.8\times10^{-5}$ | $3.9\times$ |    8/10 |
+|                337 | $2.0\times10^{-5}$ | $7.2\times10^{-6}$ | $2.8\times$ |    7/10 |
+|                697 | $9.5\times10^{-6}$ | $2.6\times10^{-6}$ | $3.6\times$ |    9/10 |
+|               1185 | $1.8\times10^{-5}$ | $8.1\times10^{-6}$ | $2.3\times$ |    9/10 |
 
-The advantage is largest at the smallest network, where plain DFR is most starved of
-resolution. Neither method is monotone in the degrees of freedom, and the near-parity at
-337 is not the baseline doing unusually well &mdash; there plain DFR is in fact twice
-worse than at 697. What narrows the gap is goal-orientation degrading. With three seeds
-and a seed-to-seed spread reaching a factor of fifty at that size, we do not read the
-337 column as evidence of a mechanism.
+The seed-to-seed spread is large (a factor of 68 at fixed size), so no single row is
+individually decisive; the aggregate is. And these are matched-budget figures: because
+goal-orientation trains a second network, the baseline gets less compute here, so the
+numbers are an upper bound corrected below.
 
 ### Varying the difficulty directly
 
@@ -245,21 +242,22 @@ appearing to measure resolution.
 <figure class="scientific">
   <img src={useBaseUrl('/img/figures/dfr-vs-go-steepness.png')} alt="QoI error versus solution steepness for plain DFR and goal-oriented DFR at two network sizes" />
   <figcaption>QoI error versus steepness $k$ at fixed network size (105 DOF, top; 337,
-  bottom) and fixed discretization, so $k$ is the only variable. Plain DFR sits at its
-  optimization floor while the problem is easy, then degrades sharply (84x from $k=2$ to
-  $k=16$ at 105 DOF); goal-oriented DFR degrades 11x, so the gap opens as the problem
+  bottom) and fixed discretization, so $k$ is the only variable, at a matched _budget_.
+  Plain DFR changes little while the problem is easy, then degrades sharply (84x from $k=2$
+  to $k=16$ at 105 DOF); goal-oriented DFR degrades 11x, so the gap opens as the problem
   hardens and the curves cross near $k \approx 5$. Below the crossover goal-orientation is
-  the worse method. Markers are medians over ten random seeds; bands span the seed
-  min&ndash;max.</figcaption>
+  the worse method. This is a matched-budget comparison; at matched cost most of the
+  advantage closes (see below). Markers are medians over ten random seeds; bands span the
+  seed min&ndash;max.</figcaption>
 </figure>
 
 Reproduce with `uv run hp-dfr data steepness` followed by `uv run hp-dfr figures`.
 
-Three regimes appear:
+At matched budget, three regimes appear:
 
 - **Resolution-limited** (`k >= 8`): goal-orientation is 5.9x better at `k=8` and 11.1x at
-  `k=16` (9/10 runs each). This is the regime the method is for, now isolated rather than
-  inferred.
+  `k=16` (9/10 runs each). This looked like the regime the method is for, but the matched-cost
+  comparison below shows it is largely the baseline being under-trained: it does not survive.
 - **A real loss** (`k=4`, 105 DOF): goal-orientation is 2.4x _worse_, winning 2 of 10 runs.
   The problem is easy enough that there is no misallocated capacity to recover, and the
   second network is a pure cost.
@@ -323,15 +321,21 @@ easy problems -- plain DFR has little QoI-relevant residual to give up, so the t
 nothing. "Goal-orientation helps when the problem is hard" is wrong at both ends of the
 sweep.
 
-**The baseline is not converged.** What looked like an accuracy floor is a fixed training
-budget cutting a slow decay at the same point each time. Trained past the shared budget,
-plain DFR keeps improving: its residual drops 6x from 3000 to 50000 Adam steps on the 2D
-problem, still falling, with no plateau. So the comparisons here are at matched _budget_,
-not matched accuracy. The reallocation mechanism does not depend on this, and the large-`k`
-advantage (where the baseline cannot reach a small residual at any budget) survives it, but
-the size of the advantage on easy problems would shrink under a longer schedule. A
-matched-cost comparison -- goal-orientation trains a second network, at about 2.5x the cost
-per run -- would be the fairer measure, and remains to be done.
+**The baseline is not converged, and matched cost roughly halves the gain.** What looked
+like an accuracy floor is a fixed budget cutting a slow decay at the same point each time:
+trained past the shared budget, plain DFR keeps improving (its 2D residual drops 6x from
+3000 to 50000 Adam steps, still falling). Because goal-orientation trains a second network,
+the fair comparison gives plain DFR 2.5x the budget to match wall-clock. At matched cost:
+
+- **2D network-size sweep: survives.** Goal-orientation is about twice as accurate (paired
+  median 2.2x, 95% CI [1.2, 4.6]), winning 28 of 40 runs.
+- **Steepness sweep: does not survive.** Goal-orientation wins only 38 of 80 runs (paired
+  median 0.92x, CI [0.69, 1.85], straddling unity). The multi-fold matched-budget advantages
+  were largely under-convergence; once plain DFR is given comparable compute, they close.
+
+So the honest result is a modest, setting-dependent ~2x improvement at equal cost, with the
+matched-budget figures as an upper bound. Reproduce with `hp-dfr data matched-cost` (the
+shardable sweep run on the ECS infrastructure in `packages/infra`).
 
 The theorem predicts none of this. Its remainder is small only when both networks are well
 resolved, which is what fails where the gains appear, so it accommodates the results without
