@@ -1,3 +1,9 @@
+## [1.3.2](https://github.com/caverac/hp-dfr/compare/v1.3.1...v1.3.2) (2026-07-20)
+
+### Bug Fixes
+
+- **docs:** reflect current structure of manuscripts ([9a9536b](https://github.com/caverac/hp-dfr/commit/9a9536be758a9fc6301800bd5551cf2914ab29e2))
+
 ## [1.3.1](https://github.com/caverac/hp-dfr/compare/v1.3.0...v1.3.1) (2026-07-20)
 
 ### Bug Fixes
