@@ -49,4 +49,4 @@ jobs:
           aws-region: us-east-1
 
       - name: Deploy sweep stack
-        run: yarn workspace @hp-dfr/infra cdk deploy all --require-approval never
+        run: yarn workspace @hp-dfr/infra cdk deploy --all --require-approval never
