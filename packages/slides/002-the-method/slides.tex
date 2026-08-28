@@ -19,11 +19,32 @@
   \begin{itemize}\itemsep0.6em
     \item Part 1: DFR gives a loss, the $H^{-1}$ dual norm of the residual, that
           is equivalent to the global energy error.
-    \item But we often want a single \important{quantity of interest} $J(u)$, and
-          global control is indirect and wasteful.
+    \item But we often want a single \important{quantity of interest} $J(u^*)$,
+          and global control is indirect and wasteful.
     \item This deck: weight the DFR loss toward $J$, using the dual-weighted
           residual (DWR) idea.
   \end{itemize}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{A quantity of interest, concretely}
+  $J$ takes the whole solution and returns \emph{one number}, and it must be
+  \important{linear} in $u$. The usual choices are:
+  \[
+    \underbrace{u(x_0)}_{\text{point value}}, \qquad
+    \underbrace{\frac{1}{|\omega|}\int_\omega u \, dx}_{\text{average over } \omega}, \qquad
+    \underbrace{\int_\Gamma \nabla u \cdot n \, ds}_{\text{flux through } \Gamma} .
+  \]
+  \begin{itemize}\itemsep0.4em
+    \item This work uses the point value, at $x_0 = (0.65, 0.65)$ in 2D.
+    \item In $d \ge 2$, $u \mapsto u(x_0)$ is not bounded on $H^1$, so we smooth
+          it: $J(u) = \int_\Omega \eta_\sigma(x - x_0)\,u(x)\,dx$, with
+          $\eta_\sigma$ a narrow normalized bump ($\sigma = 0.07$ in 2D).
+    \item \alert{The problem:} the DFR loss of Part 1 is global. Nothing in it
+          knows where $x_0$ is.
+  \end{itemize}
+  \takeaway{One number out of a whole field, and a loss that cannot see it.
+  The adjoint is what tells the loss where to look.}
 \end{frame}
 
 % =============================================================================
@@ -33,16 +54,14 @@
 \begin{frame}{The adjoint as an importance map}
   Classical finite elements answer ``where does the residual matter for my QoI?''
   with an \important{adjoint} solution $z^*$.
-  \medskip
   \begin{columns}[c]
     \begin{column}{0.55\textwidth}
-      \begin{itemize}\itemsep0.5em
-        \item $z^*$ is large where a residual error most affects $J(u)$, and small
+      \begin{itemize}\itemsep0.4em
+        \item $z^*$ solves the \important{adjoint problem}: same domain, same
+              boundary conditions, same operator, but forced by the QoI rather
+              than by $f$: for the point value above, $-\Delta z^* = \eta_\sigma(\cdot - x_0)$.
+        \item So $z^*$ is large where a residual most affects $J(u^*)$, and small
               where it does not.
-        \item The QoI error is then the residual \emph{weighted by that map}:
-              \[
-                J(u^*) - J(u_h) \;=\; \Res(u_h)(z^*) .
-              \]
       \end{itemize}
     \end{column}
     \begin{column}{0.43\textwidth}
@@ -59,8 +78,27 @@
       \end{tikzpicture}
     \end{column}
   \end{columns}
-  \takeaway{Weight the residual by the adjoint, and you localize the error onto
-  the quantity you care about. Part 3 proves this identity.}
+  \takeaway{Same operator as the primal problem, different forcing: the QoI takes
+  the place of $f$, so $z^*$ maps where the residual matters.}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{The error identity}
+  So far the residual has been a \emph{function}, $f + \Delta u_\theta$. Write it
+  instead as something that eats a test function $v$, namely
+  $\Res(u_\theta)(v) = \int_\Omega (f + \Delta u_\theta)\, v \, dx$. Feeding it the
+  adjoint gives the QoI error exactly:
+  \[
+    J(u^*) - J(u_\theta) \;=\; \Res(u_\theta)(z^*) .
+  \]
+  \begin{itemize}\itemsep0.5em
+    \item The residual is \emph{weighted by the importance map} before being
+          scored, so it is judged where the QoI cares.
+    \item But $z^*$ is the \important{true} adjoint: exact, not computable.
+          Replacing it by a network is what Part 3 pays for.
+  \end{itemize}
+  \takeaway{The QoI error is the residual tested against the true adjoint.
+  Part 3 proves it, and prices the substitution.}
 \end{frame}
 
 % =============================================================================
@@ -119,9 +157,8 @@
   \medskip
   \begin{itemize}\itemsep0.5em
     \item $\bar{z}_\phi$: adjoint held fixed (the stop-gradient).
-    \item The pairing $\Res(u_\theta)(z_\phi) = \int_\Omega (f + \Delta u_\theta)\,
-          z_\phi\, dx$ is evaluated on the same grid DFR already uses; no extra
-          quadrature.
+    \item The pairing $\Res(u_\theta)(z_\phi)$ is evaluated on the same grid DFR
+          already uses; no extra quadrature.
     \item Same spectral evaluation and boundary-cutoff construction as plain DFR.
           The only new ingredients are the adjoint and the goal term.
   \end{itemize}

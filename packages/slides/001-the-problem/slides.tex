@@ -37,9 +37,8 @@
 % =============================================================================
 
 \begin{frame}{Solving a PDE with a neural network}
-  We want $u$ solving Poisson's equation $-\Delta u = f$ with $u = 0$ on
-  $\partial\Omega$.
-  \smallskip
+  We want the \important{exact solution} $u^*$: $-\Delta u^* = f$, with $u^* = 0$
+  on $\partial\Omega$. We never have it, and every symbol below is named against it.
   \begin{itemize}\itemsep0.35em
     \item Represent the unknown by a network $u_\theta$ with parameters $\theta$.
     \item Choose $\theta$ so $u_\theta$ satisfies the equation as closely as
@@ -103,8 +102,8 @@
 
 % -----------------------------------------------------------------------------
 \begin{frame}{Boundary conditions, built in by construction}
-  The problem asks for $u = 0$ only \emph{on} the boundary $\partial\Omega$;
-  inside, $u$ is the unknown we solve for. We enforce this exactly by
+  The problem asks for $u^* = 0$ only \emph{on} the boundary $\partial\Omega$;
+  inside, $u^*$ is the unknown we solve for. We enforce this exactly by
   construction, with no loss penalty to tune.
   \smallskip
   \begin{columns}[c]
@@ -147,13 +146,13 @@
   \begin{columns}[c]
     \begin{column}{0.57\textwidth}
       \begin{itemize}\itemsep0.5em
-        \item Any function vanishing on $\partial\Omega$ is a sum of sine waves,
-              $\varepsilon(x) = \sum_k a_k \sin(k\pi x)$: one \important{mode} per
-              frequency $k$, with amplitude $a_k$.
-        \item Sines are the \important{eigenfunctions} of the Laplacian,
-              $-\Delta \sin(k\pi x) = (k\pi)^2 \sin(k\pi x)$.
-        \item So $-\Delta$ does not mix modes; it just \emph{scales} mode $k$ by
-              $(k\pi)^2$, and we can reason one mode at a time.
+        \item Any function vanishing on $\partial\Omega$ is a sum of \important{sine
+              modes} $\phi_k = \sqrt{2}\,\sin(k\pi x)$, with $\int \phi_k^2 = 1$:
+              $\varepsilon(x) = \sum_k a_k \phi_k(x)$, amplitude $a_k$ per mode.
+        \item They are the \important{eigenfunctions} of the Laplacian,
+              $-\Delta \phi_k = (k\pi)^2 \phi_k$.
+        \item So $-\Delta$ does not mix modes: it scales mode $k$ by $(k\pi)^2$,
+              and we can reason one mode at a time.
       \end{itemize}
     \end{column}
     \begin{column}{0.41\textwidth}
@@ -167,7 +166,8 @@
         \node[caption, accentdark] at (2.75,0.5) {$k=1$};
         \node[caption, danger] at (0.5,0.9) {$k=3$};
       \end{tikzpicture}\\[3pt]
-      {\small\itshape\color{neutral} higher $k$, higher frequency}
+      {\small\itshape\color{neutral} higher $k$, higher frequency\\
+       ($\phi_k$ is a mode, $\varphi$ the cutoff)}
     \end{column}
   \end{columns}
   \takeaway{In this basis $-\Delta$ is diagonal, scaling mode $k$ by $(k\pi)^2$.
@@ -204,30 +204,59 @@
 % =============================================================================
 
 \begin{frame}{The DFR fix: the dual norm of the weak residual}
-  Taylor, Pardo and Muga (2023): stop scoring the pointwise residual; measure the
-  residual in the \important{$H^{-1}$ dual norm} instead (its precise weak form
-  waits for Part 3).
-  \medskip
+  Taylor, Pardo and Muga (2023): stop scoring the pointwise residual; measure it
+  in the \important{$H^{-1}$ dual norm} instead (weak form in Part 3).
   \begin{itemize}\itemsep0.5em
     \item We saw these sine modes diagonalize $-\Delta$. The dual norm simply
           \emph{reweights} each mode of the residual by $1/\lambda_k$,
           \[
             \norm{\Res(u_\theta)}_{V^*}^2 = \sum_k \frac{|\hat{\Res}_k|^2}{\lambda_k},
-            \qquad \lambda_k = \sum_i (\pi k_i / L_i)^2 ,
+            \qquad \lambda_k = \sum_{i=1}^{d} (\pi k_i / L_i)^2 ,
           \]
-          with coefficients $\hat{\Res}_k$ from a fast Discrete Sine Transform.
-    \item In $d \ge 2$ the weight couples the axes through the \emph{sum} of
-          squared frequencies, not a product of one-dimensional weights.
-    \item \good{The point:} dividing by $\lambda_k = (k\pi)^2$ undoes exactly the
-          amplification behind the trap, so $\norm{\Res}_{V^*}$ tracks the energy
-          error instead of over-weighting high frequencies.
+          with coefficients $\hat{\Res}_k$ from a \important{Discrete Sine
+          Transform} (DST).
+    \item $k = (k_1, \dots, k_d)$ is a \important{multi-index}, one frequency per
+          axis; $i$ runs over the $d$ axes, of side lengths $L_i$. So in
+          $d \ge 2$ the weight couples the axes by a \emph{sum}, not a product.
+    \item \good{The point:} on the unit interval of the last two slides
+          ($d = 1$, $L = 1$), $\lambda_k = (k\pi)^2$; dividing by it undoes the
+          amplification behind the trap, so $\norm{\Res}_{V^*}$ tracks the
+          energy error.
   \end{itemize}
+\end{frame}
+
+% -----------------------------------------------------------------------------
+\begin{frame}{What that reweighting does to training}
+  In modes, $\varepsilon = \sum_k a_k \phi_k$ gives $\hat{\Res}_k = \lambda_k a_k$,
+  so the two losses score the \emph{same} error very differently:
+  \[
+    \mathcal{L}_{\text{PINN}} = \sum_k |\hat{\Res}_k|^2 = \sum_k \lambda_k^2 a_k^2,
+    \qquad
+    \mathcal{L}_{\text{DFR}} = \sum_k \frac{|\hat{\Res}_k|^2}{\lambda_k}
+      = \sum_k \lambda_k a_k^2 = \norm{\nabla \varepsilon}_{L^2}^2 .
+  \]
+  \begin{itemize}\itemsep0.4em
+    \item \important{The gradient is damped mode by mode:}
+          $\nabla_\theta \mathcal{L}_{\text{DFR}}
+           = 2\sum_k \lambda_k^{-1} \hat{\Res}_k \nabla_\theta \hat{\Res}_k$,
+          so high frequencies no longer dominate the update.
+    \item \important{It preconditions the problem:} in the $a_k$ the Hessian is
+          $\mathrm{diag}(\lambda_k)$, not $\mathrm{diag}(\lambda_k^2)$; over $K$
+          modes per axis the conditioning goes from $O(K^4)$ to $O(K^2)$.
+    \item \alert{The price:} the DST needs a structured grid, so training is
+          full-batch on one fixed quadrature grid, on a box, with sines as
+          eigenfunctions.
+  \end{itemize}
+  \takeaway{The DFR loss \emph{is} the energy error, so the objective is better
+  shaped, not solved: Part 4 finds plain DFR still not converged at its budget.}
 \end{frame}
 
 % -----------------------------------------------------------------------------
 \begin{frame}{DFR's guarantee}
   \begin{block}{Error-loss equivalence (Taylor, Pardo, Muga 2023)}
-    For a well-posed problem there are constants $\gamma, M > 0$ with
+    For a well-posed problem there are constants $\gamma, M > 0$ such that, for
+    \emph{any} trial function $w$ (trained or not, so in particular our
+    $u_\theta$),
     \[
       \frac{1}{M}\,\norm{\Res(w)}_{V^*}
         \;\le\; \norm{u^* - w}_U
@@ -253,7 +282,7 @@
   \medskip
   \begin{center}
   \begin{tikzpicture}[node distance=4mm and 12mm]
-    \node[opnode] (pt) {a point value\\$u(x_0)$};
+    \node[opnode] (pt) {a point value\\$u^*(x_0)$};
     \node[opnode, right=of pt] (avg) {a subdomain\\average};
     \node[opnode, right=of avg] (flux) {a boundary\\flux};
   \end{tikzpicture}
@@ -263,7 +292,7 @@
     \item A small global error is \emph{sufficient} but not \emph{necessary} for
           an accurate QoI.
     \item Driving the global error to a tight tolerance is wasteful when only
-          $J(u)$ matters.
+          $J(u^*)$ matters.
   \end{itemize}
   \takeaway{We want a loss aimed at the quantity of interest, not the whole
   field. That is Part 2.}

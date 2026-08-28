@@ -79,7 +79,7 @@ The dual-weighted residual (DWR) framework~\citep{becker2001optimal} addresses e
 The main contributions of this work are:
 \begin{enumerate}
     \item A goal-oriented DFR method that applies the dual-weighted residual framework to the DFR $H^{-1}$ dual-norm loss, with simultaneous training of a primal and an adjoint network.
-    \item A goal-oriented counterpart of the DFR error-loss equivalence: a theorem showing that the QoI-weighted dual-norm loss, plus a computable remainder, controls the error $|J(u) - J(u_h)|$ in the quantity of interest. The bound is one-sided, and we delimit what it does and does not claim.
+    \item A goal-oriented counterpart of the DFR error-loss equivalence: a theorem showing that the QoI-weighted dual-norm loss, plus a computable remainder, controls the error $|J(u^*) - J(u_h)|$ in the quantity of interest, where $u^*$ is the exact solution and $u_h$ its approximation. The bound is one-sided, and we delimit what it does and does not claim.
     \item An empirical verification of that bound, which holds on every run at a median of ten times the true error. The verification also shows that the QoI-weighted loss alone is not an error estimator: training drives it five orders of magnitude below the error that remains.
     \item An empirical study delimiting the mechanism and its size. Goal-orientation reallocates accuracy from the global solution to the quantity of interest, helping wherever plain DFR leaves QoI-relevant residual on the table. Measured at equal computational cost -- the fair comparison, since goal-orientation trains a second network -- the improvement is about twofold in the two-dimensional network-size setting (paired median $2.2$, $95\%$ interval $[1.2, 4.6]$) and not reliably present in a sweep over problem difficulty; we report the larger matched-budget figures as an upper bound.
 \end{enumerate}
@@ -94,19 +94,19 @@ The remainder of this paper is organized as follows. Section~\ref{sec:background
 
 \subsection{Problem Setting}
 
-We consider the abstract problem of finding $u \in U$ such that
+We consider the abstract problem of finding $u^* \in U$ such that
 \begin{equation}
-    \mathcal{R}(u) = 0,
+    \mathcal{R}(u^*) = 0,
 \end{equation}
 where $\mathcal{R}: U \to V^*$ is the PDE operator mapping from a trial space $U$ to the dual of a test space $V$.
 
 For example, Poisson's equation with homogeneous Dirichlet boundary conditions:
 \begin{equation}
-    -\Delta u = f \quad \text{in } \Omega, \qquad u = 0 \quad \text{on } \partial\Omega,
+    -\Delta u^* = f \quad \text{in } \Omega, \qquad u^* = 0 \quad \text{on } \partial\Omega,
 \end{equation}
-can be expressed in weak form as: find $u \in H^1_0(\Omega)$ such that
+can be expressed in weak form as: find $u^* \in H^1_0(\Omega)$ such that
 \begin{equation}
-    \inner{\nabla u}{\nabla v}_{L^2} = \inner{f}{v}_{L^2} \quad \forall v \in H^1_0(\Omega).
+    \inner{\nabla u^*}{\nabla v}_{L^2} = \inner{f}{v}_{L^2} \quad \forall v \in H^1_0(\Omega).
 \end{equation}
 
 \subsection{Physics-Informed Neural Networks}
@@ -114,7 +114,7 @@ can be expressed in weak form as: find $u \in H^1_0(\Omega)$ such that
 Physics-Informed Neural Networks (PINNs)~\citep{raissi2019physics} approximate the solution using a neural network $u_\theta$ and minimize a loss function based on the PDE residual:
 \begin{equation}
     \mathcal{L}_{\text{PINN}}(\theta) = \frac{1}{N_f} \sum_{i=1}^{N_f} |\mathcal{R}^s(u_\theta)(x_i)|^2
-        + \frac{1}{N_u} \sum_{j=1}^{N_u} |u_\theta(x_j) - u(x_j)|^2 ,
+        + \frac{1}{N_u} \sum_{j=1}^{N_u} |u_\theta(x_j) - u^*(x_j)|^2 ,
 \end{equation}
 where $\mathcal{R}^s$ denotes the strong-form residual, $\{x_i\}$ are collocation points, and the second term fits the prescribed initial and boundary data at $\{x_j\}$. Weighting the two terms against each other is a common later refinement.
 
@@ -140,9 +140,9 @@ In practice the sum in~\eqref{eq:dual-norm-spectral} is truncated at a finite mo
 
 The DFR method enjoys the following properties:
 \begin{proposition}[Error equivalence~\citep{taylor2023deep}]
-    For well-posed problems, there exist constants $\gamma, M > 0$ such that
+    For well-posed problems, there exist constants $\gamma, M > 0$ such that, for every $w \in U$,
     \begin{equation}
-        \frac{1}{M}\norm{\mathcal{R}(u)}_{V^*} \leq \norm{u - u^*}_{U} \leq \frac{1}{\gamma}\norm{\mathcal{R}(u)}_{V^*}.
+        \frac{1}{M}\norm{\mathcal{R}(w)}_{V^*} \leq \norm{w - u^*}_{U} \leq \frac{1}{\gamma}\norm{\mathcal{R}(w)}_{V^*}.
     \end{equation}
 \end{proposition}
 
@@ -150,7 +150,7 @@ This error equivalence ensures that minimizing the DFR loss is equivalent to min
 
 \subsection{From global error to quantities of interest}
 
-The error equivalence above controls the \emph{global} energy-norm error $\norm{u - u^*}_U$. When the object of interest is a functional $J(u)$ of the solution, this global control is indirect: a small DFR loss guarantees a small $H^1$ error, but not necessarily an accurate $J(u)$ at a given computational budget. The dual-weighted residual framework~\citep{becker2001optimal} closes this gap by introducing an adjoint solution that relates the QoI error to the residual, which is the starting point for the method developed in Section~\ref{sec:methodology}.
+The error equivalence above controls the \emph{global} energy-norm error $\norm{w - u^*}_U$. When the object of interest is a functional $J$ of the solution, this global control is indirect: a small DFR loss guarantees a small $H^1$ error, but not necessarily an accurate $J(u_\theta)$ at a given computational budget. The dual-weighted residual framework~\citep{becker2001optimal} closes this gap by introducing an adjoint solution that relates the QoI error to the residual, which is the starting point for the method developed in Section~\ref{sec:methodology}.
 
 % ======================================================================
 \section{Methodology}
@@ -243,6 +243,8 @@ For $w \in U$ define the residual functional $R(w) \in V^*$ by $R(w)(v) = \ell(v
   \label{eq:res-galerkin}
   R(w)(v) = a(u^* - w, v) \qquad \forall v \in V .
 \end{equation}
+
+A word on notation. We write $w \in U$ for an arbitrary trial function, and reserve $u_h \in U$ and $z_h \in V$ for the pair whose quantity-of-interest error the results below control. Nothing in this section requires either to be a network: the trained $u_\theta$ and $z_\phi$ of Section~\ref{sec:methodology} are the case we apply the results to, and the case Sections~\ref{sec:experiments} and~\ref{sec:results} measure.
 
 We assume:
 \begin{itemize}
