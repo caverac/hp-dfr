@@ -1,3 +1,9 @@
+## [1.4.2](https://github.com/caverac/hp-dfr/compare/v1.4.1...v1.4.2) (2026-08-28)
+
+### Bug Fixes
+
+- **preprint:** unified notation ([3844489](https://github.com/caverac/hp-dfr/commit/38444890a7b647ac17605e835f7fae87522078a7))
+
 ## [1.4.1](https://github.com/caverac/hp-dfr/compare/v1.4.0...v1.4.1) (2026-07-20)
 
 ### Bug Fixes
